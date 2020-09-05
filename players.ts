@@ -1,7 +1,6 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 
 import { Server, ServerEvent } from "./server.ts"
-import { WSChannel } from "./websockets.ts"
 
 export class Players extends EventEmitter<{
   join: [Player]
@@ -75,8 +74,6 @@ export class Player extends EventEmitter<{
 
   async chat(line: string) {
     const { server, uuid } = this;
-    const wsc = new WSChannel(server.conn)
-    await wsc.open("chat")
     server.write("chat", { uuid, line })
   }
 

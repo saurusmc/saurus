@@ -48,7 +48,7 @@ export class WSHandler extends EventEmitter<{
 }
 
 export class WSConnection extends EventEmitter<{
-  message: [WSData]
+  message: [string, unknown]
   close: [string | undefined]
 }> {
   constructor(
@@ -70,11 +70,21 @@ export class WSConnection extends EventEmitter<{
 
   async listen() {
     try {
-      for await (const data of this)
-        this.emit("message", data)
+      for await (const msg of this) {
+        const { channel, data } = msg
+        if (typeof channel !== "string") continue;
+        await this.emit("message", channel, data)
+      }
     } catch (e) {
-      if (!isWebSocketCloseEvent(e)) throw e;
-      this.emit("close", e.reason)
+      if (isWebSocketCloseEvent(e)) {
+        await this.emit("close", e.reason)
+      }
+
+      if (e instanceof Error) {
+        await this.close(e.message)
+      }
+
+      throw e;
     }
   }
 
@@ -83,8 +93,17 @@ export class WSConnection extends EventEmitter<{
       return data;
   }
 
-  async write(data: any) {
-    const text = JSON.stringify(data);
+  async wait(channel: string) {
+    return await new Promise<unknown>((ok, err) => {
+      const off1 = this.once(["message"], (c, d) => { c === channel && off2() && ok(d) })
+      const off2 = this.once(["close"], (r) => { off1() && err(r) })
+    })
+  }
+
+  async write(channel: string, data: unknown) {
+    if (this.closed) return;
+    const msg = { channel, data }
+    const text = JSON.stringify(msg);
     await this.socket.send(text);
   }
 
@@ -95,96 +114,5 @@ export class WSConnection extends EventEmitter<{
   async close(reason = "") {
     if (this.closed) return;
     await this.socket.close(1000, reason);
-  }
-}
-
-export interface WSData {
-  channel: string,
-  code: string,
-  content: any
-}
-
-export type WSChannelStatus = "none" | "opening" | "ready" | "closed"
-
-export class WSChannel extends EventEmitter<{
-  message: [any]
-  ready: []
-  close: [string | undefined]
-}>{
-  status: WSChannelStatus = "none"
-
-  constructor(
-    readonly conn: WSConnection,
-    readonly channel = random.string(10)
-  ) {
-    super()
-
-    conn.on(["message"], this.onmessage.bind(this))
-    conn.on(["close"], this.onclose.bind(this))
-  }
-
-  get closed() {
-    return this.status === "closed";
-  }
-
-  private async onready() {
-    this.status = "ready"
-    await this.emit("ready")
-  }
-
-  private async onclose(reason?: string) {
-    this.status = "closed"
-    await this.emit("close", reason)
-  }
-
-  private async onmessage(data: WSData) {
-    if (this.closed) return;
-
-    const { channel, code, content } = data;
-    if (channel !== this.channel) return;
-
-    if (code === "ready") {
-      await this.onready()
-      return;
-    }
-
-    if (code === "close") {
-      await this.onclose(content)
-      return;
-    }
-
-    if (code === "message") {
-      await this.emit("message", content);
-      return;
-    }
-  }
-
-  async write(content: any, code = "message") {
-    if (this.closed) return;
-
-    const { channel } = this;
-    const data: WSData = { channel, code, content }
-    await this.conn.write(data);
-  }
-
-  async open(reason?: string) {
-    if (this.status !== "none") return;
-
-    await this.write(reason, "open")
-    this.status = "opening"
-  }
-
-  async ready() {
-    if (this.status !== "opening") return
-
-    await this.write(undefined, "ready")
-    await this.onready()
-  }
-
-  async close(reason?: string) {
-    if (this.closed) return;
-
-    await this.write(reason, "close")
-    await this.onclose(reason)
   }
 }
