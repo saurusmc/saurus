@@ -13,8 +13,6 @@ import {
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts";
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
-const random = new Random();
-
 export class WSHandler extends EventEmitter<{
   accept: [WSConnection]
 }> {
@@ -114,5 +112,33 @@ export class WSConnection extends EventEmitter<{
   async close(reason = "") {
     if (this.closed) return;
     await this.socket.close(1000, reason);
+  }
+}
+
+const random = new Random()
+
+export class WSChannel extends EventEmitter<{
+  message: [unknown]
+}> {
+  constructor(
+    readonly conn: WSConnection,
+    readonly id = random.string(10)
+  ) {
+    super()
+
+    conn.on(["message"], this.onmessage.bind(this))
+  }
+
+  private async onmessage(channel: string, data: unknown) {
+    if (channel !== this.id) return;
+    await this.emit("message", data)
+  }
+
+  async write(data: any) {
+    await this.conn.write(this.id, data)
+  }
+
+  async wait() {
+    return await this.conn.wait(this.id)
   }
 }

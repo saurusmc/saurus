@@ -1,20 +1,30 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 
-import { WSConnection } from "./websockets.ts";
+import { WSConnection, WSChannel } from "./websockets.ts";
 import { Players } from "./players.ts";
 
-export interface ServerEvent {
-  type: string,
+export interface Event {
   [x: string]: any
+}
+
+export interface PlayerEvent extends Event {
+  player: {
+    uuid: string,
+    name: string
+  }
 }
 
 export class Server extends EventEmitter<{
   message: [string, unknown]
-  event: [ServerEvent]
   close: [string | undefined]
 }> {
-
   players = new Players(this)
+
+  events = new EventEmitter<{
+    "player.join": [PlayerEvent]
+    "player.quit": [PlayerEvent]
+    "player.death": [PlayerEvent]
+  }>()
 
   constructor(
     readonly conn: WSConnection
@@ -34,20 +44,20 @@ export class Server extends EventEmitter<{
 
   private async onmessage(channel: string, data: unknown) {
     if (channel === "event") {
-      const e = data as ServerEvent
-      await this.emit("event", e)
+      console.log(data)
+      const { type, ...e } = data as any
+      await this.events.emit(type, e)
       return;
     }
 
     await this.emit("message", channel, data)
   }
 
-  async write(channel: string, data: unknown) {
-    await this.conn.write(channel, data)
-  }
-
-  async wait(channel: string) {
-    return await this.conn.wait(channel)
+  async execute(command: string) {
+    const channel = new WSChannel(this.conn)
+    channel.write({ action: "execute", command })
+    const done = await channel.wait() as boolean;
+    console.log(done)
   }
 
 }
