@@ -13,7 +13,9 @@ import {
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts";
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
-export class WSHandler extends EventEmitter<{
+export { HTTPSOptions } from "https://deno.land/std@0.65.0/http/server.ts"
+
+export class WSServer extends EventEmitter<{
   accept: [WSConnection]
 }> {
   constructor(

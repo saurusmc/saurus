@@ -27,7 +27,8 @@ export class Server extends EventEmitter<{
   players = new Players(this)
 
   constructor(
-    readonly conn: WSConnection
+    readonly conn: WSConnection,
+    readonly platform: string
   ) {
     super()
 
