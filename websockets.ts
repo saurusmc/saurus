@@ -13,7 +13,7 @@ import {
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts";
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
-export { HTTPSOptions } from "https://deno.land/std@0.65.0/http/server.ts"
+export type { HTTPSOptions } from "https://deno.land/std@0.65.0/http/server.ts"
 
 export class WSServer extends EventEmitter<{
   accept: [WSConnection]
@@ -38,17 +38,27 @@ export class WSServer extends EventEmitter<{
           headers,
         });
 
-        const connection = new WSConnection(socket);
-        this.emit("accept", connection);
+        this.accept(new WSConnection(socket))
       } catch (e) {
         await req.respond({ status: 400 });
       }
     }
   }
+
+  private async accept(conn: WSConnection) {
+    try {
+      await this.emit("accept", conn)
+    } catch (e) {
+      console.error(e)
+      if (e instanceof Error)
+        conn.close(e.message)
+      else conn.close()
+    }
+  }
 }
 
 export class WSConnection extends EventEmitter<{
-  message: [string, unknown]
+  message: [unknown]
   close: [string | undefined]
 }> {
   constructor(
@@ -70,39 +80,25 @@ export class WSConnection extends EventEmitter<{
 
   async listen() {
     try {
-      for await (const msg of this) {
-        const { channel, data } = msg
-        if (typeof channel !== "string") continue;
-        await this.emit("message", channel, data)
-      }
+      for await (const data of this)
+        await this.emit("message", data)
     } catch (e) {
-      if (isWebSocketCloseEvent(e)) {
-        await this.emit("close", e.reason)
-      }
-
-      if (e instanceof Error) {
-        console.error(e)
+      console.error(e)
+      if (isWebSocketCloseEvent(e))
+        await this.close(e.reason)
+      if (e instanceof Error)
         await this.close(e.message)
-      }
     }
   }
 
   async read() {
     for await (const data of this)
-      return data;
+      return data
   }
 
-  async wait(channel: string) {
-    return await new Promise<unknown>((ok, err) => {
-      const off1 = this.once(["message"], (c, d) => { c === channel && off2() && ok(d) })
-      const off2 = this.once(["close"], (r) => { off1() && err(r) })
-    })
-  }
-
-  async write(channel: string, data: unknown) {
+  async write(data: unknown) {
     if (this.closed) return;
-    const msg = { channel, data }
-    const text = JSON.stringify(msg);
+    const text = JSON.stringify(data);
     await this.socket.send(text);
   }
 
@@ -111,35 +107,42 @@ export class WSConnection extends EventEmitter<{
   }
 
   async close(reason = "") {
-    if (this.closed) return;
+    if (this.closed) return
+    await this.emit("close", reason)
     await this.socket.close(1000, reason);
   }
 }
 
-const random = new Random()
 
 export class WSChannel extends EventEmitter<{
   message: [unknown]
+  close: [string | undefined]
 }> {
   constructor(
     readonly conn: WSConnection,
-    readonly id = random.string(10)
+    readonly id = new Random().string(10)
   ) {
     super()
 
     conn.on(["message"], this.onmessage.bind(this))
+    conn.on(["close"], (r) => this.emit("close", r))
   }
 
-  private async onmessage(channel: string, data: unknown) {
+  private async onmessage(msg: unknown) {
+    const { channel, data } = msg as any
     if (channel !== this.id) return;
     await this.emit("message", data)
   }
 
   async write(data: any) {
-    await this.conn.write(this.id, data)
+    const channel = this.id
+    await this.conn.write({ channel, data })
   }
 
   async wait() {
-    return await this.conn.wait(this.id)
+    return await new Promise<unknown>((ok, err) => {
+      const off1 = this.once(["message"], (d) => { off2() && ok(d) })
+      const off2 = this.once(["close"], (r) => { off1() && err(r) })
+    })
   }
 }

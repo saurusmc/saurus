@@ -1,8 +1,9 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 
-import { Client } from "./client.ts"
-import { Server } from "./server.ts"
 import { WSChannel } from "./websockets.ts"
+
+import type { Server } from "./server.ts"
+import type { Client } from "./client.ts"
 
 export interface TitleDuration {
   fadein: number,
@@ -11,7 +12,7 @@ export interface TitleDuration {
 }
 
 export class Player extends EventEmitter<{
-  connect: []
+  connect: [Client]
   death: []
   quit: []
 }> {

@@ -3,11 +3,7 @@ import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 import { WSConnection, WSChannel } from "./websockets.ts";
 import { Players } from "./players.ts";
 
-export interface Event {
-  [x: string]: any
-}
-
-export interface PlayerEvent extends Event {
+export interface PlayerEvent {
   player: {
     uuid: string,
     name: string
@@ -15,7 +11,7 @@ export interface PlayerEvent extends Event {
 }
 
 export class Server extends EventEmitter<{
-  open: [WSChannel]
+  open: [WSChannel, unknown]
   close: [string | undefined]
 }> {
   events = new EventEmitter<{
@@ -32,10 +28,17 @@ export class Server extends EventEmitter<{
   ) {
     super()
 
-    conn.on(["close"], this.onclose.bind(this))
+    const events = this.channel("event")
+    events.on(["message"], this.onevent.bind(this))
+
     conn.on(["message"], this.onmessage.bind(this))
+    conn.on(["close"], this.onclose.bind(this))
 
     conn.listen()
+  }
+
+  channel(id?: string) {
+    return new WSChannel(this.conn, id)
   }
 
   private async onclose(reason?: string) {
@@ -43,26 +46,28 @@ export class Server extends EventEmitter<{
     await this.emit("close", reason)
   }
 
-  private async onmessage(id: string, data: unknown) {
-    if (id === "event") {
-      console.log(data)
-      const { type, ...e } = data as any
-      await this.events.emit(type, e)
-      return;
-    }
+  private async onmessage(msg: any) {
+    const { channel: id, method, data } = msg;
 
-    if (data === "open") {
-      const channel = new WSChannel(this.conn, id)
-      await this.emit("open", channel)
-      return;
+    if (method === "open") {
+      console.log("opened", id)
+      const channel = this.channel(id)
+      await this.emit("open", channel, data)
     }
+  }
+
+  private async onevent(data: unknown) {
+    console.log("event", data)
+    const { type, ...e } = data as any
+    await this.events.emit(type, e)
+    return;
   }
 
   async execute(command: string) {
     const channel = new WSChannel(this.conn)
     channel.write({ action: "execute", command })
     const done = await channel.wait() as boolean;
-    console.log(done)
+    return done;
   }
 
 }

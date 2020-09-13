@@ -1,4 +1,4 @@
-import { WSConnection } from "./websockets.ts";
+import type { WSConnection } from "./websockets.ts";
 
 export class Client {
   constructor(

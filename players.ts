@@ -1,6 +1,6 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 
-import { Server, PlayerEvent } from "./server.ts"
+import type { Server, PlayerEvent } from "./server.ts"
 import { Player } from "./player.ts"
 
 export class Players extends EventEmitter<{
