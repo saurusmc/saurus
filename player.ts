@@ -24,13 +24,18 @@ export class Player extends EventEmitter<{
     this.on(["death"], () => this.actionbar("Haha!"))
   }
 
+  get json() {
+    const { name, uuid } = this;
+    return { name, uuid }
+  }
+
   async msg(line: string) {
     const { conn } = this.server
     const channel = new WSChannel(conn)
 
     await channel.write({
       action: "player.message",
-      uuid: this.uuid,
+      player: this.json,
       message: line
     })
   }
@@ -41,7 +46,7 @@ export class Player extends EventEmitter<{
 
     await channel.write({
       action: "player.actionbar",
-      uuid: this.uuid,
+      player: this.json,
       message: line
     })
   }
@@ -56,7 +61,7 @@ export class Player extends EventEmitter<{
 
     await channel.write({
       action: "player.title",
-      uuid: this.uuid,
+      player: this.json,
       title: title,
       subtitle: subtitle,
       ...duration

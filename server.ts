@@ -15,16 +15,16 @@ export interface PlayerEvent extends Event {
 }
 
 export class Server extends EventEmitter<{
-  message: [string, unknown]
+  open: [WSChannel]
   close: [string | undefined]
 }> {
-  players = new Players(this)
-
   events = new EventEmitter<{
     "player.join": [PlayerEvent]
     "player.quit": [PlayerEvent]
     "player.death": [PlayerEvent]
   }>()
+
+  players = new Players(this)
 
   constructor(
     readonly conn: WSConnection
@@ -42,15 +42,19 @@ export class Server extends EventEmitter<{
     await this.emit("close", reason)
   }
 
-  private async onmessage(channel: string, data: unknown) {
-    if (channel === "event") {
+  private async onmessage(id: string, data: unknown) {
+    if (id === "event") {
       console.log(data)
       const { type, ...e } = data as any
       await this.events.emit(type, e)
       return;
     }
 
-    await this.emit("message", channel, data)
+    if (data === "open") {
+      const channel = new WSChannel(this.conn, id)
+      await this.emit("open", channel)
+      return;
+    }
   }
 
   async execute(command: string) {

@@ -79,10 +79,9 @@ export class WSConnection extends EventEmitter<{
       }
 
       if (e instanceof Error) {
+        console.error(e)
         await this.close(e.message)
       }
-
-      throw e;
     }
   }
 
