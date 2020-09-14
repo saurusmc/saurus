@@ -2,6 +2,7 @@ import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 
 import { WSConnection, WSChannel } from "./websockets.ts";
 import { Players } from "./players.ts";
+import { Connection } from "./connection.ts";
 
 export interface PlayerEvent {
   player: {
@@ -10,7 +11,7 @@ export interface PlayerEvent {
   }
 }
 
-export class Server extends EventEmitter<{
+export class Server extends Connection<{
   open: [WSChannel, unknown]
   close: [string | undefined]
 }> {
@@ -26,32 +27,23 @@ export class Server extends EventEmitter<{
     readonly conn: WSConnection,
     readonly platform: string
   ) {
-    super()
+    super(conn)
 
-    const events = this.channel("event")
+    const events = new WSChannel(conn, "event")
     events.on(["message"], this.onevent.bind(this))
-
-    conn.on(["message"], this.onmessage.bind(this))
-    conn.on(["close"], this.onclose.bind(this))
-
-    conn.listen()
   }
 
-  channel(id?: string) {
-    return new WSChannel(this.conn, id)
-  }
-
-  private async onclose(reason?: string) {
+  protected async onclose(reason?: string) {
     console.log(`Closed: ${reason}`)
     await this.emit("close", reason)
   }
 
-  private async onmessage(msg: any) {
+  protected async onmessage(msg: any) {
     const { channel: id, method, data } = msg;
 
     if (method === "open") {
       console.log("opened", id)
-      const channel = this.channel(id)
+      const channel = new WSChannel(this.conn, id)
       await this.emit("open", channel, data)
     }
   }

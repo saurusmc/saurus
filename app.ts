@@ -1,17 +1,20 @@
+import type { Client } from "./client.ts";
 import type { WSConnection } from "./websockets.ts";
-import type { Player } from "./player.ts";
-import type { App } from "./app.ts";
+
 import { Connection } from "./connection.ts";
 
-export class Client extends Connection<{
-  app: [App]
+export class App extends Connection<{
   close: [string | undefined]
-}> {
+}>{
   constructor(
     readonly conn: WSConnection,
-    readonly player: Player,
+    readonly client: Client
   ) {
     super(conn)
+  }
+
+  get player() {
+    return this.client.player
   }
 
   protected async hello() {

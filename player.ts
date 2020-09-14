@@ -1,9 +1,8 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 
-import { WSChannel } from "./websockets.ts"
-
 import type { Server } from "./server.ts"
 import type { Client } from "./client.ts"
+import type { App } from "./app.ts"
 
 export interface TitleDuration {
   fadein: number,
@@ -13,6 +12,7 @@ export interface TitleDuration {
 
 export class Player extends EventEmitter<{
   connect: [Client]
+  app: [App]
   death: []
   quit: []
 }> {
@@ -25,7 +25,11 @@ export class Player extends EventEmitter<{
   ) {
     super()
 
+    server.on(["close"], this.onserverclose.bind(this))
+
     this.on(["death"], () => this.actionbar("Haha!"))
+    this.on(["connect"], this.onconnect.bind(this))
+    this.on(["quit"], this.onquit.bind(this))
   }
 
   get json() {
@@ -33,25 +37,50 @@ export class Player extends EventEmitter<{
     return { name, uuid }
   }
 
-  async msg(line: string) {
-    const { conn } = this.server
-    const channel = new WSChannel(conn)
+  private async onconnect(client: Client) {
+    client.on(["app"], this.onapp.bind(this))
+    client.on(["close"], this.onclientclose.bind(this))
+    await this.actionbar("Connected")
+    this.client = client;
+  }
 
-    await channel.write({
-      action: "player.message",
-      player: this.json,
-      message: line
+  private async onapp(app: App) {
+    await this.emit("app", app)
+  }
+
+  private async onserverclose() {
+    await this.emit("quit")
+  }
+
+  private async onclientclose() {
+    await this.kick("Disconnected")
+  }
+
+  private async onquit() {
+    await this.client?.conn.close()
+    delete this.client
+  }
+
+  async kick(reason?: string) {
+    await this.server.send({
+      actionn: "player.kick",
+      reason
     })
   }
 
-  async actionbar(line: string) {
-    const { conn } = this.server
-    const channel = new WSChannel(conn)
+  async msg(message: string) {
+    await this.server.send({
+      action: "player.message",
+      player: this.json,
+      message
+    })
+  }
 
-    await channel.write({
+  async actionbar(message: string) {
+    await this.server.send({
       action: "player.actionbar",
       player: this.json,
-      message: line
+      message
     })
   }
 
@@ -60,10 +89,7 @@ export class Player extends EventEmitter<{
     subtitle: string,
     duration?: TitleDuration
   ) {
-    const { conn } = this.server
-    const channel = new WSChannel(conn)
-
-    await channel.write({
+    await this.server.send({
       action: "player.title",
       player: this.json,
       title: title,

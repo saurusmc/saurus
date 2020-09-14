@@ -139,9 +139,9 @@ export class WSChannel extends EventEmitter<{
     await this.conn.write({ channel, data })
   }
 
-  async wait() {
-    return await new Promise<unknown>((ok, err) => {
-      const off1 = this.once(["message"], (d) => { off2() && ok(d) })
+  async wait<T = unknown>() {
+    return await new Promise<T>((ok, err) => {
+      const off1 = this.once(["message"], (d) => { off2() && ok(d as T) })
       const off2 = this.once(["close"], (r) => { off1() && err(r) })
     })
   }
