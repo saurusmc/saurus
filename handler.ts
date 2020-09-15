@@ -76,7 +76,9 @@ export class Handler extends EventEmitter<{
       if (!client) throw new Error("Invalid")
 
       const data = { action: "authorize", token }
-      const result = await client.request<boolean>(data, 60000)
+      const channel = await client.open("authorize")
+      await channel.write(token)
+      const result = await channel.wait<boolean>()
       if (!result) throw new Error("Refused")
 
       const app = new App(conn, client)

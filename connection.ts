@@ -1,14 +1,16 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
-import { timeout as Timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
 
 import { WSChannel, WSCMessage, WSConnection } from "./websockets.ts";
 
-export class Connection<E extends {
-  channel: [WSChannel, unknown]
+export interface ConnectionEvents {
   close: [string | undefined]
-}> extends EventEmitter<E> {
+}
+
+export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
   readonly id = new Random().string(10)
+
+  readonly channels = new EventEmitter<{ [x: string]: [WSChannel] }>()
 
   constructor(
     readonly conn: WSConnection
@@ -34,20 +36,17 @@ export class Connection<E extends {
   protected async onmessage(msg: WSCMessage) {
     const { channel: id, method, data } = msg;
 
-    if(method === "open"){
+    if (method === "open") {
+      if (typeof data !== "string") return;
+      const reason = data as string
       const channel = new WSChannel(this.conn, id)
-      await this.emit("channel", channel, data)
+      await this.channels.emit(reason, channel)
     }
   }
 
-  async send(data: unknown) {
-    await new WSChannel(this.conn).open(data)
-  }
-
-  async request<T = unknown>(data: unknown, timeout = 1000) {
+  async open(reason: string) {
     const channel = new WSChannel(this.conn)
-    await channel.open(data)
-    const promise = channel.wait<T>()
-    return await Timeout(promise, timeout)
+    await channel.open(reason)
+    return channel
   }
 }

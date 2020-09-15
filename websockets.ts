@@ -133,12 +133,12 @@ export class WSChannel extends EventEmitter<{
     conn.on(["close"], this.onconnclose.bind(this))
   }
 
-  async open(data: any){
-    await this.write(data, "open")
+  async open(reason: string){
+    await this.write(reason, "open")
   }
 
-  async close(data: any){
-    await this.write(data, "close")
+  async close(reason?: string){
+    await this.write(reason, "close")
   }
 
   private async onmessage(msg: WSCMessage) {
@@ -146,7 +146,8 @@ export class WSChannel extends EventEmitter<{
     if (channel !== this.id) return;
 
     if(method === "close") {
-      await this.emit("close", data)
+      const reason = data as string
+      await this.emit("close", reason)
       return;
     }
 
