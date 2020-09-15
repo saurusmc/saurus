@@ -1,9 +1,11 @@
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
+import { timeout as Timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
 
-import { WSChannel, WSConnection } from "./websockets.ts";
+import { WSChannel, WSCMessage, WSConnection } from "./websockets.ts";
 
 export class Connection<E extends {
+  channel: [WSChannel, unknown]
   close: [string | undefined]
 }> extends EventEmitter<E> {
   readonly id = new Random().string(10)
@@ -29,18 +31,23 @@ export class Connection<E extends {
     await this.emit("close", reason)
   }
 
-  protected async onmessage(msg: any) {
+  protected async onmessage(msg: WSCMessage) {
+    const { channel: id, method, data } = msg;
 
+    if(method === "open"){
+      const channel = new WSChannel(this.conn, id)
+      await this.emit("channel", channel, data)
+    }
   }
 
   async send(data: unknown) {
-    const channel = new WSChannel(this.conn)
-    await channel.write(data)
+    await new WSChannel(this.conn).open(data)
   }
 
-  async request<T = unknown>(data: unknown) {
+  async request<T = unknown>(data: unknown, timeout = 1000) {
     const channel = new WSChannel(this.conn)
-    await channel.write(data)
-    return await channel.wait<T>()
+    await channel.open(data)
+    const promise = channel.wait<T>()
+    return await Timeout(promise, timeout)
   }
 }

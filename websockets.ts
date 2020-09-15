@@ -58,7 +58,7 @@ export class WSServer extends EventEmitter<{
 }
 
 export class WSConnection extends EventEmitter<{
-  message: [unknown]
+  message: [WSCMessage]
   close: [string | undefined]
 }> {
   constructor(
@@ -113,10 +113,15 @@ export class WSConnection extends EventEmitter<{
   }
 }
 
+export interface WSCMessage {
+  channel: string,
+  method: string,
+  data: unknown
+}
 
 export class WSChannel extends EventEmitter<{
   message: [unknown]
-  close: [string | undefined]
+  close: [any]
 }> {
   constructor(
     readonly conn: WSConnection,
@@ -125,18 +130,36 @@ export class WSChannel extends EventEmitter<{
     super()
 
     conn.on(["message"], this.onmessage.bind(this))
-    conn.on(["close"], (r) => this.emit("close", r))
+    conn.on(["close"], this.onconnclose.bind(this))
   }
 
-  private async onmessage(msg: unknown) {
-    const { channel, data } = msg as any
+  async open(data: any){
+    await this.write(data, "open")
+  }
+
+  async close(data: any){
+    await this.write(data, "close")
+  }
+
+  private async onmessage(msg: WSCMessage) {
+    const { channel, method, data } = msg
     if (channel !== this.id) return;
+
+    if(method === "close") {
+      await this.emit("close", data)
+      return;
+    }
+
     await this.emit("message", data)
   }
 
-  async write(data: any) {
+  private async onconnclose(reason?: string){
+    await this.emit("close", reason)
+  }
+
+  async write(data: any, method?: string) {
     const channel = this.id
-    await this.conn.write({ channel, data })
+    await this.conn.write({ channel, method, data })
   }
 
   async wait<T = unknown>() {

@@ -1,7 +1,7 @@
 
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
-import { timeout, TimeoutError } from "https://deno.land/x/timeout@1.0/mod.ts"
+import { timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
 
 import { Client } from "./client.ts";
 import { Server } from "./server.ts";
@@ -76,8 +76,7 @@ export class Handler extends EventEmitter<{
       if (!client) throw new Error("Invalid")
 
       const data = { action: "authorize", token }
-      const request = client.request<boolean>(data)
-      const result = await timeout(request, 60000)
+      const result = await client.request<boolean>(data, 60000)
       if (!result) throw new Error("Refused")
 
       const app = new App(conn, client)

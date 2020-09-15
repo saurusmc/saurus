@@ -12,7 +12,7 @@ export interface PlayerEvent {
 }
 
 export class Server extends Connection<{
-  open: [WSChannel, unknown]
+  channel: [WSChannel, unknown]
   close: [string | undefined]
 }> {
   events = new EventEmitter<{
@@ -34,18 +34,8 @@ export class Server extends Connection<{
   }
 
   protected async onclose(reason?: string) {
+    super.onclose(reason)
     console.log(`Closed: ${reason}`)
-    await this.emit("close", reason)
-  }
-
-  protected async onmessage(msg: any) {
-    const { channel: id, method, data } = msg;
-
-    if (method === "open") {
-      console.log("opened", id)
-      const channel = new WSChannel(this.conn, id)
-      await this.emit("open", channel, data)
-    }
   }
 
   private async onevent(data: unknown) {
