@@ -1,7 +1,6 @@
 
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
-import { timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
 
 import { Client } from "./client.ts";
 import { Server } from "./server.ts";
@@ -65,6 +64,8 @@ export class Handler extends EventEmitter<{
 
       const client = new Client(conn, player)
       this.clients.set(client.id, client)
+      await client.hello()
+
       await player.emit("connect", client)
       console.log("Client connected", player.name)
     }
@@ -75,13 +76,13 @@ export class Handler extends EventEmitter<{
       const client = this.clients.get(id)
       if (!client) throw new Error("Invalid")
 
-      const data = { action: "authorize", token }
-      const channel = await client.open("authorize")
-      await channel.write(token)
+      const channel = await client.open("authorize", token)
       const result = await channel.wait<boolean>()
       if (!result) throw new Error("Refused")
 
       const app = new App(conn, client)
+      await app.hello()
+
       await client.emit("app", app)
       console.log("App connected", app.player.name)
     }
@@ -93,6 +94,7 @@ export class Handler extends EventEmitter<{
         throw new PasswordError();
 
       const server = new Server(conn, platform)
+      await server.hello()
       await this.emit("server", server)
     }
 

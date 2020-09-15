@@ -9,13 +9,19 @@ export class App extends Connection {
     readonly client: Client
   ) {
     super(conn)
+
+    client.on(["close"], this.onclientclose.bind(this))
   }
 
   get player() {
     return this.client.player
   }
 
-  protected async hello() {
+  private async onclientclose() {
+    await this.conn.close()
+  }
+
+  async hello() {
     await this.conn.write({
       id: this.id,
       player: this.player.json

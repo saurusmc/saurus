@@ -11,9 +11,15 @@ export class Client extends Connection<ConnectionEvents & {
     readonly player: Player,
   ) {
     super(conn)
+
+    player.once(["quit"], this.onquit.bind(this))
   }
 
-  protected async hello() {
+  private async onquit() {
+    await this.conn.close()
+  }
+
+  async hello() {
     await this.conn.write({
       id: this.id,
       player: this.player.json

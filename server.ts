@@ -29,7 +29,7 @@ export class Server extends Connection<{
   ) {
     super(conn)
 
-    const events = new WSChannel(conn, "event")
+    const events = new WSChannel(this.conn, "event")
     events.on(["message"], this.onevent.bind(this))
   }
 
@@ -46,9 +46,8 @@ export class Server extends Connection<{
   }
 
   async execute(command: string) {
-    const channel = new WSChannel(this.conn)
-    channel.write({ action: "execute", command })
-    const done = await channel.wait() as boolean;
+    const channel = await this.open("execute", command)
+    const done = await channel.wait<boolean>();
     return done;
   }
 

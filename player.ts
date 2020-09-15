@@ -29,7 +29,6 @@ export class Player extends EventEmitter<{
 
     this.on(["death"], () => this.actionbar("Haha!"))
     this.on(["connect"], this.onconnect.bind(this))
-    this.on(["quit"], this.onquit.bind(this))
   }
 
   get json() {
@@ -56,32 +55,28 @@ export class Player extends EventEmitter<{
     await this.kick("Disconnected")
   }
 
-  private async onquit() {
-    await this.client?.conn.close()
-    delete this.client
-  }
-
   async kick(reason?: string) {
-    await this.server.send({
-      actionn: "player.kick",
-      reason
-    })
+    const action = "player.kick"
+    const player = this.json
+
+    const data = { player, reason }
+    await this.server.open(action, data)
   }
 
   async msg(message: string) {
-    await this.server.send({
-      action: "player.message",
-      player: this.json,
-      message
-    })
+    const action = "player.message"
+    const player = this.json
+
+    const data = { player, message }
+    await this.server.open(action, data)
   }
 
   async actionbar(message: string) {
-    await this.server.send({
-      action: "player.actionbar",
-      player: this.json,
-      message
-    })
+    const action = "player.actionbar"
+    const player = this.json
+
+    const data = { player, message }
+    await this.server.open(action, data)
   }
 
   async title(
@@ -89,12 +84,16 @@ export class Player extends EventEmitter<{
     subtitle: string,
     duration?: TitleDuration
   ) {
-    await this.server.send({
-      action: "player.title",
-      player: this.json,
-      title: title,
-      subtitle: subtitle,
+    const action = "player.title"
+    const player = this.json
+
+    const data = {
+      player,
+      title,
+      subtitle,
       ...duration
-    })
+    }
+
+    await this.server.open(action, data)
   }
 }

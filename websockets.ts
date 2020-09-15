@@ -12,6 +12,7 @@ import {
 
 import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts";
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
+import { timeout as Timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
 
 export type { HTTPSOptions } from "https://deno.land/std@0.65.0/http/server.ts"
 
@@ -113,15 +114,30 @@ export class WSConnection extends EventEmitter<{
   }
 }
 
-export interface WSCMessage {
+export type WSCMessage = WSOpenMessage | WSCloseMessage | WSCOtherMessage
+
+export interface WSOpenMessage {
   channel: string,
-  method: string,
+  method: "open",
+  action: string,
+  data: unknown
+}
+
+export interface WSCloseMessage {
+  channel: string,
+  method: "close",
+  reason?: string
+}
+
+export interface WSCOtherMessage {
+  channel: string
+  method: "none"
   data: unknown
 }
 
 export class WSChannel extends EventEmitter<{
   message: [unknown]
-  close: [any]
+  close: [string | undefined]
 }> {
   constructor(
     readonly conn: WSConnection,
@@ -133,40 +149,61 @@ export class WSChannel extends EventEmitter<{
     conn.on(["close"], this.onconnclose.bind(this))
   }
 
-  async open(reason: string){
-    await this.write(reason, "open")
+  async open(action: string, data: unknown) {
+    const open: WSOpenMessage = {
+      channel: this.id,
+      method: "open",
+      action,
+      data,
+    }
+
+    await this.conn.write(open)
   }
 
-  async close(reason?: string){
-    await this.write(reason, "close")
+  async close(reason?: string) {
+    const close: WSCloseMessage = {
+      channel: this.id,
+      method: "close",
+      reason,
+    }
+
+    await this.conn.write(close)
   }
 
   private async onmessage(msg: WSCMessage) {
-    const { channel, method, data } = msg
-    if (channel !== this.id) return;
+    if (msg.channel !== this.id) return;
 
-    if(method === "close") {
-      const reason = data as string
-      await this.emit("close", reason)
+    if (msg.method === "close") {
+      await this.emit("close", msg.reason)
       return;
     }
 
-    await this.emit("message", data)
+    if (msg.method === "none") {
+      await this.emit("message", msg.data)
+      return;
+    }
   }
 
-  private async onconnclose(reason?: string){
+  private async onconnclose(reason?: string) {
     await this.emit("close", reason)
   }
 
-  async write(data: any, method?: string) {
-    const channel = this.id
-    await this.conn.write({ channel, method, data })
+  async write(data: any) {
+    const other: WSCOtherMessage = {
+      channel: this.id,
+      method: "none",
+      data
+    }
+
+    await this.conn.write(other)
   }
 
-  async wait<T = unknown>() {
-    return await new Promise<T>((ok, err) => {
+  async wait<T = unknown>(timeout = 1000) {
+    const promise = new Promise<T>((ok, err) => {
       const off1 = this.once(["message"], (d) => { off2() && ok(d as T) })
       const off2 = this.once(["close"], (r) => { off1() && err(r) })
     })
+
+    return await Timeout(promise, timeout)
   }
 }

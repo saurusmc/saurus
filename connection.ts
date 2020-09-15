@@ -10,21 +10,20 @@ export interface ConnectionEvents {
 export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
   readonly id = new Random().string(10)
 
-  readonly channels = new EventEmitter<{ [x: string]: [WSChannel] }>()
+  readonly channels = new EventEmitter<{ [x: string]: [WSChannel, unknown] }>()
 
   constructor(
     readonly conn: WSConnection
   ) {
     super()
 
-    this.hello()
     conn.listen()
 
     conn.on(["close"], this.onclose.bind(this))
     conn.on(["message"], this.onmessage.bind(this))
   }
 
-  protected async hello() {
+  async hello() {
     const { id } = this;
     await this.conn.write({ id })
   }
@@ -34,19 +33,16 @@ export class Connection<E extends ConnectionEvents = ConnectionEvents> extends E
   }
 
   protected async onmessage(msg: WSCMessage) {
-    const { channel: id, method, data } = msg;
-
-    if (method === "open") {
-      if (typeof data !== "string") return;
-      const reason = data as string
+    if (msg.method === "open") {
+      const { channel: id, action, data } = msg;
       const channel = new WSChannel(this.conn, id)
-      await this.channels.emit(reason, channel)
+      await this.channels.emit(action, channel, data)
     }
   }
 
-  async open(reason: string) {
+  async open(action: string, data?: unknown) {
     const channel = new WSChannel(this.conn)
-    await channel.open(reason)
+    await channel.open(action, data)
     return channel
   }
 }
