@@ -1,4 +1,4 @@
-import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
+import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import { WSConnection, WSChannel } from "./websockets.ts";
 import { Players } from "./players.ts";
@@ -11,10 +11,7 @@ export interface PlayerEvent {
   }
 }
 
-export class Server extends Connection<{
-  channel: [WSChannel, unknown]
-  close: [string | undefined]
-}> {
+export class Server extends Connection {
   events = new EventEmitter<{
     "player.join": [PlayerEvent]
     "player.quit": [PlayerEvent]

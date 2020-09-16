@@ -10,7 +10,7 @@ import {
   isWebSocketCloseEvent
 } from "https://deno.land/std@0.65.0/ws/mod.ts";
 
-import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts";
+import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 import { timeout as Timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
 

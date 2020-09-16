@@ -1,11 +1,13 @@
-import type { WSChannel, WSConnection } from "./websockets.ts";
+import type { WSConnection } from "./websockets.ts";
 import type { Player } from "./player.ts";
 import type { App } from "./app.ts";
 import { Connection, ConnectionEvents } from "./connection.ts";
 
-export class Client extends Connection<ConnectionEvents & {
+export interface ClientEvents extends ConnectionEvents {
   app: [App]
-}> {
+}
+
+export class Client extends Connection<ClientEvents> {
   constructor(
     readonly conn: WSConnection,
     readonly player: Player,

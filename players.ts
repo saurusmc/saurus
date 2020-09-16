@@ -1,14 +1,14 @@
-import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
+import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import type { Server, PlayerEvent } from "./server.ts"
-import { Player } from "./player.ts"
+import { Player, UUID } from "./player.ts"
 
 export class Players extends EventEmitter<{
   join: [Player]
   death: [Player]
   quit: [Player]
 }>{
-  uuids = new Map<string, Player>()
+  uuids = new Map<UUID, Player>()
   names = new Map<string, Player>()
 
   constructor(

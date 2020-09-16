@@ -1,5 +1,5 @@
 
-import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
+import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
 import { Client } from "./client.ts";

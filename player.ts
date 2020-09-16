@@ -1,4 +1,4 @@
-import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
+import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import type { Server } from "./server.ts"
 import type { Client } from "./client.ts"
@@ -8,6 +8,13 @@ export interface TitleDuration {
   fadein: number,
   stay: number
   fadeout: number
+}
+
+export type UUID = string;
+
+export interface PlayerInfo {
+  name: string,
+  uuid: UUID
 }
 
 export class Player extends EventEmitter<{
@@ -21,7 +28,7 @@ export class Player extends EventEmitter<{
   constructor(
     readonly server: Server,
     readonly name: string,
-    readonly uuid: string
+    readonly uuid: UUID
   ) {
     super()
 
@@ -31,7 +38,7 @@ export class Player extends EventEmitter<{
     this.on(["connect"], this.onconnect.bind(this))
   }
 
-  get json() {
+  get json(): PlayerInfo {
     const { name, uuid } = this;
     return { name, uuid }
   }

@@ -1,5 +1,5 @@
 import { readLines } from "https://deno.land/std@0.65.0/io/bufio.ts";
-import { EventEmitter } from "https://deno.land/x/mutevents@3.0/mod.ts"
+import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 export class Console extends EventEmitter<{
   command: [string]
