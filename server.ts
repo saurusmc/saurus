@@ -3,12 +3,10 @@ import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 import { WSConnection, WSChannel } from "./websockets.ts";
 import { Players } from "./players.ts";
 import { Connection } from "./connection.ts";
+import type { PlayerInfo } from "./player.ts";
 
 export interface PlayerEvent {
-  player: {
-    uuid: string,
-    name: string
-  }
+  player: PlayerInfo
 }
 
 export class Server extends Connection {

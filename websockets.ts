@@ -86,7 +86,7 @@ export class WSConnection extends EventEmitter<{
     } catch (e) {
       console.error(e)
       if (isWebSocketCloseEvent(e))
-        await this.close(e.reason)
+        await this.emit("close", e.reason)
       if (e instanceof Error)
         await this.close(e.message)
     }

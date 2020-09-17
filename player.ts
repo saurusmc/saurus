@@ -45,7 +45,7 @@ export class Player extends EventEmitter<{
 
   private async onconnect(client: Client) {
     client.on(["app"], this.onapp.bind(this))
-    client.on(["close"], this.onclientclose.bind(this))
+    client.once(["close"], this.onclientclose.bind(this))
     await this.actionbar("Connected")
     this.client = client;
   }
@@ -59,6 +59,7 @@ export class Player extends EventEmitter<{
   }
 
   private async onclientclose() {
+    console.log("Client disconnected")
     await this.kick("Disconnected")
   }
 
