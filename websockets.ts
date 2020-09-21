@@ -66,23 +66,20 @@ export class WSConnection extends EventEmitter<{
     readonly socket: WebSocket
   ) {
     super();
+
+    this.listen()
   }
 
-  private async *[Symbol.asyncIterator]() {
-    for await (const e of this.socket) {
-      if (isWebSocketCloseEvent(e)) throw e;
-      if (isWebSocketPingEvent(e)) continue;
-      if (typeof e !== "string") continue;
-
-      const data = JSON.parse(e);
-      yield data;
-    }
-  }
-
-  async listen() {
+  private async listen() {
     try {
-      for await (const data of this)
+      for await (const e of this.socket) {
+        if (isWebSocketCloseEvent(e)) throw e;
+        if (isWebSocketPingEvent(e)) continue;
+        if (typeof e !== "string") continue;
+
+        const data = JSON.parse(e);
         await this.emit("message", data)
+      }
     } catch (e) {
       console.error(e)
       if (isWebSocketCloseEvent(e))
@@ -93,14 +90,24 @@ export class WSConnection extends EventEmitter<{
   }
 
   async read() {
-    for await (const data of this)
-      return data
+    return await new Promise<WSCMessage>((ok, err) => {
+      const off1 = this.once(["message"], m => { off2(); ok(m) })
+      const off2 = this.once(["close"], r => { off1(); err(r) })
+    })
+  }
+
+  async *[Symbol.asyncIterator]() {
+    while (true) yield await this.read()
   }
 
   async write(data: unknown) {
     if (this.closed) return;
     const text = JSON.stringify(data);
     await this.socket.send(text);
+  }
+
+  async wait(timeout = 1000) {
+    return await Timeout(this.read(), timeout)
   }
 
   get closed() {
@@ -145,8 +152,13 @@ export class WSChannel extends EventEmitter<{
   ) {
     super()
 
-    conn.on(["message"], this.onmessage.bind(this))
-    conn.on(["close"], this.onconnclose.bind(this))
+    const offmessage =
+      conn.on(["message"], d => this.onmessage(d))
+
+    conn.once(["close"], (r) => {
+      offmessage()
+      this.onconnclose(r)
+    })
   }
 
   async open(action: string, data: unknown) {
@@ -198,12 +210,18 @@ export class WSChannel extends EventEmitter<{
     await this.conn.write(other)
   }
 
-  async wait<T = unknown>(timeout = 1000) {
-    const promise = new Promise<T>((ok, err) => {
-      const off1 = this.once(["message"], (d) => { off2() && ok(d as T) })
-      const off2 = this.once(["close"], (r) => { off1() && err(r) })
+  async read<T = unknown>() {
+    return await new Promise<T>((ok, err) => {
+      const off1 = this.once(["message"], d => { off2(); ok(d as T) })
+      const off2 = this.once(["close"], r => { off1(); err(r) })
     })
+  }
 
-    return await Timeout(promise, timeout)
+  async *[Symbol.asyncIterator]() {
+    while (true) yield await this.read()
+  }
+
+  async wait<T = unknown>(timeout = 1000) {
+    return await Timeout(this.read<T>(), timeout)
   }
 }

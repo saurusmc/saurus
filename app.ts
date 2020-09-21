@@ -21,10 +21,10 @@ export class App extends Connection {
     await this.conn.close()
   }
 
-  async hello() {
-    await this.conn.write({
+  get hello() {
+    return {
       id: this.id,
       player: this.player.json
-    })
+    }
   }
 }

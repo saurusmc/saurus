@@ -10,22 +10,22 @@ export interface ConnectionEvents {
 export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
   readonly id = new Random().string(10)
 
-  readonly channels = new EventEmitter<{ [x: string]: [WSChannel, unknown] }>()
+  readonly channels = new EventEmitter<{ 
+    [x: string]: [WSChannel, unknown] 
+  }>()
 
   constructor(
     readonly conn: WSConnection
   ) {
     super()
 
-    conn.listen()
-
     conn.on(["close"], this.onclose.bind(this))
     conn.on(["message"], this.onmessage.bind(this))
   }
 
-  async hello() {
+  get hello() {
     const { id } = this;
-    await this.conn.write({ id })
+    return { id }
   }
 
   protected async onclose(reason?: string) {

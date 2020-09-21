@@ -54,52 +54,54 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
-    const hello = await conn.read() as Hello
+    const hello = new WSChannel(conn, "hello")
+    const msg = await hello.read<Hello>()
 
-    if (hello.type === "client") {
-      const { code } = hello;
+    if (msg.type === "client") {
+      const { code } = msg;
 
       const player = this.codes.get(code)
       if (!player) throw new Error("Invalid")
 
       const client = new Client(conn, player)
       this.clients.set(client.id, client)
-      await client.hello()
+      await hello.write(client.hello)
 
       await player.emit("connect", client)
       console.log("Client connected", player.name)
     }
 
-    if (hello.type === "app") {
-      const { id, token } = hello
+    if (msg.type === "app") {
+      const { id, token } = msg
 
       const client = this.clients.get(id)
       if (!client) throw new Error("Invalid")
 
       const channel = await client.open("authorize", token)
-      const result = await channel.wait<boolean>()
+      const result = await channel.wait<boolean>(1000)
       if (!result) throw new Error("Refused")
 
       const app = new App(conn, client)
-      await app.hello()
+      await hello.write(app.hello)
 
       await client.emit("app", app)
       console.log("App connected", app.player.name)
     }
 
-    if (hello.type === "server") {
-      const { password, platform } = hello
+    if (msg.type === "server") {
+      const { password, platform } = msg
 
       if (password !== this.options.password)
         throw new PasswordError();
 
       const server = new Server(conn, platform)
-      await server.hello()
+      await hello.write(server.hello)
+
       await this.emit("server", server)
     }
 
-    if (hello.type === "proxy") {
-      const { password, platform } = hello
+    if (msg.type === "proxy") {
+      const { password, platform } = msg
 
       if (password !== this.options.password)
         throw new PasswordError();
