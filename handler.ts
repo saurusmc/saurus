@@ -6,7 +6,7 @@ import { Client } from "./client.ts";
 import { Server } from "./server.ts";
 import { WSServer, HTTPSOptions, WSConnection, WSChannel } from "./websockets.ts";
 
-import type { Player } from "./player.ts";
+import type { Player, UUID } from "./player.ts";
 import { App } from "./app.ts";
 
 export class PasswordError extends Error {
@@ -28,7 +28,7 @@ export interface ClientHello {
 
 export interface AppHello {
   type: "app",
-  id: string
+  uuid: UUID
   token: string
 }
 
@@ -41,7 +41,7 @@ export class Handler extends EventEmitter<{
 }> {
   readonly server = new WSServer(this.options)
 
-  readonly clients = new Map<string, Client>()
+  readonly clients = new Map<UUID, Client>()
   readonly codes = new Map<string, Player>()
 
   constructor(
@@ -54,8 +54,10 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
+    conn.on(["message"], console.log)
     const hello = new WSChannel(conn, "hello")
     const msg = await hello.read<Hello>()
+    console.log(msg)
 
     if (msg.type === "client") {
       const { code } = msg;
@@ -64,7 +66,7 @@ export class Handler extends EventEmitter<{
       if (!player) throw new Error("Invalid")
 
       const client = new Client(conn, player)
-      this.clients.set(client.id, client)
+      this.clients.set(client.uuid, client)
       await hello.write(client.hello)
 
       await player.emit("connect", client)
@@ -72,9 +74,9 @@ export class Handler extends EventEmitter<{
     }
 
     if (msg.type === "app") {
-      const { id, token } = msg
+      const { uuid, token } = msg
 
-      const client = this.clients.get(id)
+      const client = this.clients.get(uuid)
       if (!client) throw new Error("Invalid")
 
       const channel = await client.open("authorize", token)
@@ -110,27 +112,29 @@ export class Handler extends EventEmitter<{
     }
   }
 
+  gen() {
+    while (true) {
+      const code = new Random().string(6)
+      if (this.codes.get(code)) continue
+      return code
+    }
+  }
+
   private async onserver(server: Server) {
     server.players.on(["join"], (player) => {
-      let code: string;
-
-      while (true) {
-        code = new Random().string(6)
-        if (this.codes.get(code)) continue
-        this.codes.set(code, player)
-        break;
-      }
+      const code = this.gen()
+      this.codes.set(code, player)
 
       const show = () => player.actionbar(`Code: ${code}`)
       const kick = () => player.kick("Not connected")
 
-      const i = setTimeout(kick, 60 * 1000)
-      const j = setInterval(show, 1 * 1000)
+      const t = setTimeout(kick, 60 * 1000)
+      const i = setInterval(show, 1 * 1000)
 
       const clean = () => {
         this.codes.delete(code)
-        clearTimeout(i)
-        clearInterval(j)
+        clearTimeout(t)
+        clearInterval(i)
       }
 
       player.once(["connect"], clean)

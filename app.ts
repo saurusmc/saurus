@@ -23,7 +23,7 @@ export class App extends Connection {
 
   get hello() {
     return {
-      id: this.id,
+      ...super.hello,
       player: this.player.json
     }
   }

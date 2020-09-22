@@ -11,8 +11,8 @@ import {
 } from "https://deno.land/std@0.65.0/ws/mod.ts";
 
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
-import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 import { timeout as Timeout } from "https://deno.land/x/timeout@1.0/mod.ts"
+import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
 
 export type { HTTPSOptions } from "https://deno.land/std@0.65.0/http/server.ts"
 
@@ -59,7 +59,7 @@ export class WSServer extends EventEmitter<{
 }
 
 export class WSConnection extends EventEmitter<{
-  message: [WSCMessage]
+  message: [WSMessage]
   close: [string | undefined]
 }> {
   constructor(
@@ -90,7 +90,7 @@ export class WSConnection extends EventEmitter<{
   }
 
   async read() {
-    return await new Promise<WSCMessage>((ok, err) => {
+    return await new Promise<WSMessage>((ok, err) => {
       const off1 = this.once(["message"], m => { off2(); ok(m) })
       const off2 = this.once(["close"], r => { off1(); err(r) })
     })
@@ -100,9 +100,9 @@ export class WSConnection extends EventEmitter<{
     while (true) yield await this.read()
   }
 
-  async write(data: unknown) {
+  async write(msg: WSMessage) {
     if (this.closed) return;
-    const text = JSON.stringify(data);
+    const text = JSON.stringify(msg);
     await this.socket.send(text);
   }
 
@@ -121,24 +121,10 @@ export class WSConnection extends EventEmitter<{
   }
 }
 
-export type WSCMessage = WSOpenMessage | WSCloseMessage | WSCOtherMessage
-
-export interface WSOpenMessage {
-  channel: string,
-  method: "open",
-  action: string,
-  data: unknown
-}
-
-export interface WSCloseMessage {
-  channel: string,
-  method: "close",
-  reason?: string
-}
-
-export interface WSCOtherMessage {
+export interface WSMessage {
   channel: string
-  method: "none"
+  method?: "open" | "close"
+  action?: string
   data: unknown
 }
 
@@ -148,7 +134,7 @@ export class WSChannel extends EventEmitter<{
 }> {
   constructor(
     readonly conn: WSConnection,
-    readonly id = new Random().string(10)
+    readonly channel = UUID.generate()
   ) {
     super()
 
@@ -162,8 +148,8 @@ export class WSChannel extends EventEmitter<{
   }
 
   async open(action: string, data: unknown) {
-    const open: WSOpenMessage = {
-      channel: this.id,
+    const open: WSMessage = {
+      channel: this.channel,
       method: "open",
       action,
       data,
@@ -173,24 +159,25 @@ export class WSChannel extends EventEmitter<{
   }
 
   async close(reason?: string) {
-    const close: WSCloseMessage = {
-      channel: this.id,
+    const close: WSMessage = {
+      channel: this.channel,
       method: "close",
-      reason,
+      data: reason,
     }
 
     await this.conn.write(close)
   }
 
-  private async onmessage(msg: WSCMessage) {
-    if (msg.channel !== this.id) return;
+  private async onmessage(msg: WSMessage) {
+    if (msg.channel !== this.channel) return;
 
     if (msg.method === "close") {
-      await this.emit("close", msg.reason)
+      const reason = msg.data as string | undefined
+      await this.emit("close", reason)
       return;
     }
 
-    if (msg.method === "none") {
+    if (!msg.method) {
       await this.emit("message", msg.data)
       return;
     }
@@ -201,13 +188,8 @@ export class WSChannel extends EventEmitter<{
   }
 
   async write(data: any) {
-    const other: WSCOtherMessage = {
-      channel: this.id,
-      method: "none",
-      data
-    }
-
-    await this.conn.write(other)
+    const { conn, channel } = this;
+    await conn.write({ channel, data })
   }
 
   async read<T = unknown>() {

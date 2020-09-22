@@ -1,17 +1,17 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
-import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
+import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
 
-import { WSChannel, WSCMessage, WSConnection } from "./websockets.ts";
+import { WSChannel, WSMessage, WSConnection } from "./websockets.ts";
 
 export interface ConnectionEvents {
   close: [string | undefined]
 }
 
 export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
-  readonly id = new Random().string(10)
+  readonly uuid = UUID.generate()
 
-  readonly channels = new EventEmitter<{ 
-    [x: string]: [WSChannel, unknown] 
+  readonly channels = new EventEmitter<{
+    [x: string]: [WSChannel, unknown]
   }>()
 
   constructor(
@@ -24,17 +24,19 @@ export class Connection<E extends ConnectionEvents = ConnectionEvents> extends E
   }
 
   get hello() {
-    const { id } = this;
-    return { id }
+    return {
+      uuid: this.uuid
+    }
   }
 
   protected async onclose(reason?: string) {
     await this.emit("close", reason)
   }
 
-  protected async onmessage(msg: WSCMessage) {
+  protected async onmessage(msg: WSMessage) {
     if (msg.method === "open") {
       const { channel: id, action, data } = msg;
+      if (!action) return;
       const channel = new WSChannel(this.conn, id)
       await this.channels.emit(action, channel, data)
     }

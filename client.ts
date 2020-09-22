@@ -23,7 +23,7 @@ export class Client extends Connection<ClientEvents> {
 
   get hello() {
     return {
-      id: this.id,
+      ...super.hello,
       player: this.player.json
     }
   }
