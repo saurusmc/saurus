@@ -28,7 +28,7 @@ export interface ClientHello {
 
 export interface AppHello {
   type: "app",
-  uuid: UUID
+  client: UUID
   token: string
 }
 
@@ -55,55 +55,52 @@ export class Handler extends EventEmitter<{
 
   private async onaccept(conn: WSConnection) {
     conn.on(["message"], console.log)
-    const hello = new WSChannel(conn, "hello")
-    const msg = await hello.read<Hello>()
-    console.log(msg)
 
-    if (msg.type === "client") {
-      const { code } = msg;
+    const [channel, hello] =
+      await conn.wait<Hello>("/hello")
+
+    if (hello.type === "client") {
+      const { code } = hello;
 
       const player = this.codes.get(code)
       if (!player) throw new Error("Invalid")
 
       const client = new Client(conn, player)
       this.clients.set(client.uuid, client)
-      await hello.write(client.hello)
-
+      await channel.close(client.hello)
       await player.emit("connect", client)
-      console.log("Client connected", player.name)
     }
 
-    if (msg.type === "app") {
-      const { uuid, token } = msg
-
-      const client = this.clients.get(uuid)
+    if (hello.type === "app") {
+      const client = this.clients.get(hello.client)
       if (!client) throw new Error("Invalid")
 
-      const channel = await client.open("authorize", token)
-      const result = await channel.wait<boolean>(1000)
+      const result: boolean =
+        await client.request("/authorize", hello.token)
+
       if (!result) throw new Error("Refused")
 
       const app = new App(conn, client)
-      await hello.write(app.hello)
+      await channel.close(app.hello)
 
       await client.emit("app", app)
       console.log("App connected", app.player.name)
     }
 
-    if (msg.type === "server") {
-      const { password, platform } = msg
+    if (hello.type === "server") {
+      const { password, platform } = hello
 
       if (password !== this.options.password)
         throw new PasswordError();
 
       const server = new Server(conn, platform)
-      await hello.write(server.hello)
+      await channel.close(server.hello)
 
       await this.emit("server", server)
     }
 
-    if (msg.type === "proxy") {
-      const { password, platform } = msg
+    if (hello.type === "proxy") {
+      const { password, platform } = hello
 
       if (password !== this.options.password)
         throw new PasswordError();

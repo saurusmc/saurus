@@ -1,17 +1,17 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
 
-import { WSChannel, WSMessage, WSConnection } from "./websockets.ts";
+import type { Close, WSChannel, WSConnection } from "./websockets.ts";
 
 export interface ConnectionEvents {
-  close: [string | undefined]
+  close: [e: Close]
 }
 
 export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
   readonly uuid = UUID.generate()
 
   readonly channels = new EventEmitter<{
-    [x: string]: [WSChannel, unknown]
+    [path: string]: [channel: WSChannel, data: unknown]
   }>()
 
   constructor(
@@ -19,8 +19,7 @@ export class Connection<E extends ConnectionEvents = ConnectionEvents> extends E
   ) {
     super()
 
-    conn.on(["close"], this.onclose.bind(this))
-    conn.on(["message"], this.onmessage.bind(this))
+    conn.once(["close"], e => this.emit("close", e))
   }
 
   get hello() {
@@ -29,22 +28,14 @@ export class Connection<E extends ConnectionEvents = ConnectionEvents> extends E
     }
   }
 
-  protected async onclose(reason?: string) {
-    await this.emit("close", reason)
+  // Open a channel
+  async open(path: string, data?: unknown) {
+    return await this.conn.open(path, data)
   }
 
-  protected async onmessage(msg: WSMessage) {
-    if (msg.method === "open") {
-      const { channel: id, action, data } = msg;
-      if (!action) return;
-      const channel = new WSChannel(this.conn, id)
-      await this.channels.emit(action, channel, data)
-    }
-  }
-
-  async open(action: string, data?: unknown) {
-    const channel = new WSChannel(this.conn)
-    await channel.open(action, data)
-    return channel
+  // Shortcut for quick request-response
+  async request<T>(path: string, data?: unknown) {
+    const channel = await this.open(path, data)
+    return await channel.read<T>()
   }
 }

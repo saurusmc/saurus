@@ -17,7 +17,7 @@ import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
 export type { HTTPSOptions } from "https://deno.land/std@0.65.0/http/server.ts"
 
 export class WSServer extends EventEmitter<{
-  accept: [WSConnection]
+  accept: [conn: WSConnection]
 }> {
   constructor(
     readonly options: HTTPSOptions,
@@ -58,9 +58,14 @@ export class WSServer extends EventEmitter<{
   }
 }
 
+export class Close {
+  constructor(readonly reason?: string) { }
+}
+
 export class WSConnection extends EventEmitter<{
-  message: [WSMessage]
-  close: [string | undefined]
+  open: [{ channel: WSChannel, path: string, data: unknown }]
+  message: [msg: WSMessage]
+  close: [e: Close]
 }> {
   constructor(
     readonly socket: WebSocket
@@ -70,140 +75,193 @@ export class WSConnection extends EventEmitter<{
     this.listen()
   }
 
-  private async listen() {
-    try {
-      for await (const e of this.socket) {
-        if (isWebSocketCloseEvent(e)) throw e;
-        if (isWebSocketPingEvent(e)) continue;
-        if (typeof e !== "string") continue;
-
-        const data = JSON.parse(e);
-        await this.emit("message", data)
-      }
-    } catch (e) {
-      console.error(e)
-      if (isWebSocketCloseEvent(e))
-        await this.emit("close", e.reason)
-      if (e instanceof Error)
-        await this.close(e.message)
-    }
-  }
-
-  async read() {
-    return await new Promise<WSMessage>((ok, err) => {
-      const off1 = this.once(["message"], m => { off2(); ok(m) })
-      const off2 = this.once(["close"], r => { off1(); err(r) })
-    })
-  }
-
   async *[Symbol.asyncIterator]() {
     while (true) yield await this.read()
-  }
-
-  async write(msg: WSMessage) {
-    if (this.closed) return;
-    const text = JSON.stringify(msg);
-    await this.socket.send(text);
-  }
-
-  async wait(timeout = 1000) {
-    return await Timeout(this.read(), timeout)
   }
 
   get closed() {
     return this.socket.isClosed;
   }
 
-  async close(reason = "") {
-    if (this.closed) return
-    await this.emit("close", reason)
+  private async listen() {
+    try {
+      for await (const e of this.socket) {
+        if (isWebSocketCloseEvent(e)) throw e;
+        if (isWebSocketPingEvent(e)) continue;
+        if (typeof e !== "string") continue;
+        this.onmessage(JSON.parse(e) as WSMessage)
+      }
+    } catch (e) {
+      if (isWebSocketCloseEvent(e))
+        await this.emit("close", new Close(e.reason))
+      if (e instanceof Error)
+        await this.close(e.message)
+    }
+  }
+
+  protected async onmessage(msg: WSMessage) {
+    await this.emit("message", msg)
+
+    if (msg.type === "open") {
+      const { uuid, path, data } = msg;
+      const channel = new WSChannel(this, uuid)
+      await this.emit("open", { channel, path, data })
+    }
+  }
+
+  async wait<T>(path: string) {
+    if (this.closed)
+      throw new Error("Closed")
+
+    return await new Promise<[WSChannel, T]>((ok, err) => {
+      const off1 = this.once(["open"], (e) => {
+        if (e.path !== path) return
+        const { channel, data } = e
+        ok([channel, data as T])
+        off2();
+      })
+
+      const off2 = this.once(["close"], e => { off1(); err(e) })
+    })
+  }
+
+  async read() {
+    if (this.closed)
+      throw new Error("Closed")
+
+    return await new Promise<WSMessage>((ok, err) => {
+      const off1 = this.once(["message"],
+        (msg) => { off2(); ok(msg) })
+
+      const off2 = this.once(["close"],
+        (reason?) => { off1(); err(reason) })
+    })
+  }
+
+  async open(path: string, data?: unknown) {
+    const channel = new WSChannel(this)
+    await channel.open(path, data)
+    return channel
+  }
+
+  async send(msg: WSMessage) {
+    if (this.closed)
+      throw new Error("Closed")
+
+    const text = JSON.stringify(msg);
+    await this.socket.send(text);
+  }
+
+  async close(reason = "Closed") {
+    if (this.closed)
+      throw new Error("Closed")
+
     await this.socket.close(1000, reason);
+    await this.emit("close", new Close(reason))
   }
 }
 
-export interface WSMessage {
-  channel: string
-  method?: "open" | "close"
-  action?: string
+export type WSMessage = WSOpenMessage | WSOtherMessage | WSCloseMessage | WSErrorMessage
+
+export interface WSOpenMessage {
+  uuid: string
+  type: "open"
+  path: string
   data: unknown
 }
 
+export interface WSOtherMessage {
+  uuid: string
+  type: "other"
+  data: unknown
+}
+
+export interface WSCloseMessage {
+  uuid: string,
+  type: "close"
+  data: unknown
+}
+
+export interface WSErrorMessage {
+  uuid: string
+  type: "error"
+  reason?: string
+}
+
 export class WSChannel extends EventEmitter<{
-  message: [unknown]
-  close: [string | undefined]
+  message: [data: unknown]
+  close: [e: Close]
 }> {
+  private offmessage: () => unknown
+
   constructor(
     readonly conn: WSConnection,
-    readonly channel = UUID.generate()
+    readonly uuid = UUID.generate()
   ) {
     super()
 
-    const offmessage =
-      conn.on(["message"], d => this.onmessage(d))
+    this.offmessage = conn.on(["message"],
+      this.onmessage.bind(this))
 
-    conn.once(["close"], (r) => {
-      offmessage()
-      this.onconnclose(r)
-    })
-  }
-
-  async open(action: string, data: unknown) {
-    const open: WSMessage = {
-      channel: this.channel,
-      method: "open",
-      action,
-      data,
-    }
-
-    await this.conn.write(open)
-  }
-
-  async close(reason?: string) {
-    const close: WSMessage = {
-      channel: this.channel,
-      method: "close",
-      data: reason,
-    }
-
-    await this.conn.write(close)
-  }
-
-  private async onmessage(msg: WSMessage) {
-    if (msg.channel !== this.channel) return;
-
-    if (msg.method === "close") {
-      const reason = msg.data as string | undefined
-      await this.emit("close", reason)
-      return;
-    }
-
-    if (!msg.method) {
-      await this.emit("message", msg.data)
-      return;
-    }
-  }
-
-  private async onconnclose(reason?: string) {
-    await this.emit("close", reason)
-  }
-
-  async write(data: any) {
-    const { conn, channel } = this;
-    await conn.write({ channel, data })
-  }
-
-  async read<T = unknown>() {
-    return await new Promise<T>((ok, err) => {
-      const off1 = this.once(["message"], d => { off2(); ok(d as T) })
-      const off2 = this.once(["close"], r => { off1(); err(r) })
-    })
+    conn.once(["close"], e => this.emit("close", e))
+    this.once(["close"], this.onclose.bind(this))
   }
 
   async *[Symbol.asyncIterator]() {
     while (true) yield await this.read()
   }
 
-  async wait<T = unknown>(timeout = 1000) {
-    return await Timeout(this.read<T>(), timeout)
+  private async onmessage(msg: WSMessage) {
+    if (msg.uuid !== this.uuid) return;
+
+    if (msg.type === "other") {
+      await this.emit("message", msg.data)
+    }
+
+    if (msg.type === "close") {
+      await this.emit("message", msg.data)
+      await this.emit("close", new Close("OK"))
+    }
+
+    if (msg.type === "error") {
+      await this.emit("close", new Close(msg.reason))
+    }
+  }
+
+  private async onclose() {
+    this.offmessage()
+  }
+
+  async open(path: string, data?: unknown) {
+    const { conn, uuid } = this
+    await conn.send({ uuid, type: "open", path, data })
+  }
+
+  async close(data?: unknown) {
+    const { conn, uuid } = this;
+
+    await conn.send({ uuid, type: "close", data })
+  }
+
+  async error(reason?: string) {
+    const { conn, uuid } = this;
+
+    await conn.send({ uuid, type: "error", reason })
+  }
+
+  async send(data?: unknown) {
+    const { conn, uuid } = this;
+
+    await conn.send({ uuid, type: "other", data })
+  }
+
+  async read<T = unknown>() {
+    return await new Promise<T>((ok, err) => {
+      const off1 = this.once(["message"],
+        (data) => { off2(); ok(data as T) })
+
+      const off2 = this.once(["close"],
+        (reason?) => { off1(); err(reason) })
+    })
   }
 }

@@ -28,11 +28,6 @@ export class Server extends Connection {
     events.on(["message"], this.onevent.bind(this))
   }
 
-  protected async onclose(reason?: string) {
-    super.onclose(reason)
-    console.log(`Closed: ${reason}`)
-  }
-
   private async onevent(data: unknown) {
     console.log("event", data)
     const { type, ...e } = data as any
@@ -41,8 +36,9 @@ export class Server extends Connection {
   }
 
   async execute(command: string) {
-    const channel = await this.open("execute", command)
-    const done = await channel.wait<boolean>();
+    const done: boolean =
+      await this.request("execute", command)
+
     return done;
   }
 

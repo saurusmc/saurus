@@ -64,27 +64,24 @@ export class Player extends EventEmitter<{
   }
 
   async kick(reason?: string) {
-    const action = "player.kick"
-    const player = this.json
-
-    const data = { player, reason }
-    await this.server.open(action, data)
+    await this.server.request("/player/kick", {
+      player: this.json,
+      reason
+    })
   }
 
   async msg(message: string) {
-    const action = "player.message"
-    const player = this.json
-
-    const data = { player, message }
-    await this.server.open(action, data)
+    await this.server.request("/player/message", {
+      player: this.json,
+      message
+    })
   }
 
   async actionbar(message: string) {
-    const action = "player.actionbar"
-    const player = this.json
-
-    const data = { player, message }
-    await this.server.open(action, data)
+    await this.server.request("/player/actionbar", {
+      player: this.json,
+      message
+    })
   }
 
   async title(
@@ -92,16 +89,11 @@ export class Player extends EventEmitter<{
     subtitle: string,
     duration?: TitleDuration
   ) {
-    const action = "player.title"
-    const player = this.json
-
-    const data = {
-      player,
+    await this.server.request("/player/title", {
+      player: this.json,
       title,
       subtitle,
       ...duration
-    }
-
-    await this.server.open(action, data)
+    })
   }
 }
