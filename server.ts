@@ -1,19 +1,27 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
-import { WSConnection, WSChannel } from "./websockets.ts";
 import { Players } from "./players.ts";
 import { Connection } from "./connection.ts";
-import type { PlayerInfo } from "./player.ts";
+import { WSChannel } from "./websockets/channel.ts";
 
-export interface PlayerEvent {
+import type { PlayerInfo } from "./player.ts";
+import type { WSConnection } from "./websockets/connection.ts";
+
+export interface Event {
+  event: string
+}
+
+export interface PlayerEvent extends Event {
   player: PlayerInfo
 }
+
 
 export class Server extends Connection {
   events = new EventEmitter<{
     "player.join": [PlayerEvent]
     "player.quit": [PlayerEvent]
     "player.death": [PlayerEvent]
+    [x: string]: [Event]
   }>()
 
   players = new Players(this)
@@ -24,20 +32,25 @@ export class Server extends Connection {
   ) {
     super(conn)
 
-    const events = new WSChannel(this.conn, "event")
-    events.on(["message"], this.onevent.bind(this))
+    this.listenevents()
   }
 
-  private async onevent(data: unknown) {
-    console.log("event", data)
-    const { type, ...e } = data as any
-    await this.events.emit(type, e)
-    return;
+  private async listenevents() {
+    const events = await this.open("/events")
+
+    const offmessage = events.on(["message"],
+      (d) => this.onevent(d as Event))
+
+    events.once(["close"], offmessage)
+  }
+
+  private async onevent(e: Event) {
+    await this.events.emit(e.event, e)
   }
 
   async execute(command: string) {
     const done: boolean =
-      await this.request("execute", command)
+      await this.request("/execute", command)
 
     return done;
   }

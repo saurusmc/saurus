@@ -4,14 +4,13 @@ import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
 import { Client } from "./client.ts";
 import { Server } from "./server.ts";
-import { WSServer, HTTPSOptions, WSConnection, WSChannel } from "./websockets.ts";
 
 import type { Player, UUID } from "./player.ts";
 import { App } from "./app.ts";
 
-export class PasswordError extends Error {
-  constructor() { super("Bad password") }
-}
+import { HTTPSOptions, WSServer } from "./websockets/server.ts";
+import type { WSConnection } from "./websockets/connection.ts";
+import type { WSChannel } from "./websockets/channel.ts";
 
 export type Hello = ServerHello | ClientHello | AppHello
 
@@ -59,61 +58,72 @@ export class Handler extends EventEmitter<{
     const [channel, hello] =
       await conn.wait<Hello>("/hello")
 
-    if (hello.type === "client") {
-      const { code } = hello;
+    if (hello.type === "server")
+      await this.handleserver(channel, hello)
 
-      const player = this.codes.get(code)
-      if (!player) throw new Error("Invalid")
+    if (hello.type === "client")
+      await this.handleclient(channel, hello)
 
-      const client = new Client(conn, player)
-      this.clients.set(client.uuid, client)
-      await channel.close(client.hello)
-      await player.emit("connect", client)
-    }
+    if (hello.type === "app")
+      await this.handleapp(channel, hello)
 
-    if (hello.type === "app") {
-      const client = this.clients.get(hello.client)
-      if (!client) throw new Error("Invalid")
+    if (hello.type === "proxy")
+      await this.handleproxy(channel, hello)
+  }
 
-      const result: boolean =
-        await client.request("/authorize", hello.token)
+  private async handleserver(channel: WSChannel, hello: ServerHello) {
+    const { password, platform } = hello
 
-      if (!result) throw new Error("Refused")
+    if (password !== this.options.password)
+      throw new Error("Bad password");
 
-      const app = new App(conn, client)
-      await channel.close(app.hello)
+    const server = new Server(channel.conn, platform)
+    await channel.close(server.hello)
 
-      await client.emit("app", app)
-      console.log("App connected", app.player.name)
-    }
+    await this.emit("server", server)
+  }
 
-    if (hello.type === "server") {
-      const { password, platform } = hello
+  private async handleclient(channel: WSChannel, hello: ClientHello) {
+    const { code } = hello;
 
-      if (password !== this.options.password)
-        throw new PasswordError();
+    const player = this.codes.get(code)
+    if (!player) throw new Error("Invalid")
 
-      const server = new Server(conn, platform)
-      await channel.close(server.hello)
+    const client = new Client(channel.conn, player)
+    this.clients.set(client.uuid, client)
+    await channel.close(client.hello)
+    await player.emit("connect", client)
+  }
 
-      await this.emit("server", server)
-    }
+  private async handleapp(channel: WSChannel, hello: AppHello) {
+    const client = this.clients.get(hello.client)
+    if (!client) throw new Error("Invalid")
 
-    if (hello.type === "proxy") {
-      const { password, platform } = hello
+    const result: boolean =
+      await client.request("/authorize", hello.token)
 
-      if (password !== this.options.password)
-        throw new PasswordError();
+    if (!result) throw new Error("Refused")
 
-      console.log("Proxy connected", platform)
-    }
+    const app = new App(channel.conn, client)
+    await channel.close(app.hello)
+
+    await client.emit("app", app)
+    console.log("App connected", app.player.name)
+  }
+
+  private async handleproxy(channel: WSChannel, hello: ServerHello) {
+    const { password, platform } = hello
+
+    if (password !== this.options.password)
+      throw new Error("Bad password");
+
+    console.log("Proxy connected", platform)
   }
 
   gen() {
     while (true) {
       const code = new Random().string(6)
-      if (this.codes.get(code)) continue
-      return code
+      if (!this.codes.get(code)) return code
     }
   }
 

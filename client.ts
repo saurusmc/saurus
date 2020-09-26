@@ -1,6 +1,7 @@
-import type { WSConnection } from "./websockets.ts";
 import type { Player } from "./player.ts";
 import type { App } from "./app.ts";
+import type { WSConnection } from "./websockets/connection.ts";
+
 import { Connection, ConnectionEvents } from "./connection.ts";
 
 export interface ClientEvents extends ConnectionEvents {
@@ -18,7 +19,8 @@ export class Client extends Connection<ClientEvents> {
   }
 
   private async onquit() {
-    await this.conn.close()
+    if (!this.conn.closed)
+      await this.conn.close()
   }
 
   get hello() {

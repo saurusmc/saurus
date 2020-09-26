@@ -1,5 +1,5 @@
 import type { Client } from "./client.ts";
-import type { WSChannel, WSConnection } from "./websockets.ts";
+import type { WSConnection } from "./websockets/connection.ts";
 
 import { Connection } from "./connection.ts";
 
@@ -10,7 +10,8 @@ export class App extends Connection {
   ) {
     super(conn)
 
-    client.on(["close"], this.onclientclose.bind(this))
+    client.once(["close"],
+      this.onclientclose.bind(this))
   }
 
   get player() {

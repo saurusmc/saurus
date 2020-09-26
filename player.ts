@@ -13,6 +13,7 @@ export interface TitleDuration {
 export type UUID = string;
 
 export interface PlayerInfo {
+  [x: string]: unknown,
   name: string,
   uuid: UUID
 }
@@ -20,6 +21,7 @@ export interface PlayerInfo {
 export class Player extends EventEmitter<{
   connect: [Client]
   app: [App]
+  json: [PlayerInfo]
   death: []
   quit: []
 }> {
@@ -59,6 +61,7 @@ export class Player extends EventEmitter<{
   }
 
   private async onclientclose() {
+    delete this.client
     console.log("Client disconnected")
     await this.kick("Disconnected")
   }
