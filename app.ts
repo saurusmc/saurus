@@ -10,8 +10,7 @@ export class App extends Connection {
   ) {
     super(conn)
 
-    client.once(["close"],
-      this.onclientclose.bind(this))
+    client.once(["close"], this.onclientclose.bind(this))
   }
 
   get player() {
@@ -25,7 +24,7 @@ export class App extends Connection {
   get hello() {
     return {
       ...super.hello,
-      player: this.player.json
+      player: this.player.info
     }
   }
 }

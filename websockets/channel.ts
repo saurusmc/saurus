@@ -64,12 +64,15 @@ export class WSChannel extends EventEmitter<{
   }
 
   async read<T = unknown>() {
-    return await new Promise<T>((ok, err) => {
-      const off1 = this.once(["message"],
-        (data) => { off2(); ok(data as T) })
+    let off1: () => unknown
+    let off2: () => unknown
 
-      const off2 = this.once(["close"],
-        (close) => { off1(); err(close) })
-    })
+    const promise = new Promise<unknown>((ok, err) => {
+      off1 = this.once(["message"], ok)
+      off2 = this.once(["close"], err)
+    }) as Promise<T>
+
+    const clean = () => { off1(); off2() }
+    return await promise.finally(clean)
   }
 }

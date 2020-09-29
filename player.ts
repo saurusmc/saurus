@@ -20,8 +20,7 @@ export interface PlayerInfo {
 
 export class Player extends EventEmitter<{
   connect: [Client]
-  app: [App]
-  json: [PlayerInfo]
+  info: [PlayerInfo]
   death: []
   quit: []
 }> {
@@ -40,20 +39,21 @@ export class Player extends EventEmitter<{
     this.on(["connect"], this.onconnect.bind(this))
   }
 
-  get json(): PlayerInfo {
+  async info(extras = false) {
     const { name, uuid } = this;
-    return { name, uuid }
+    const info = { name, uuid }
+
+    if (extras)
+      await this.emit("info", info)
+
+    return info
   }
 
   private async onconnect(client: Client) {
-    client.on(["app"], this.onapp.bind(this))
-    client.once(["close"], this.onclientclose.bind(this))
-    await this.actionbar("Connected")
     this.client = client;
-  }
-
-  private async onapp(app: App) {
-    await this.emit("app", app)
+    client.once(["close"],
+      this.onclientclose.bind(this))
+    await this.actionbar("Connected")
   }
 
   private async onserverclose() {
@@ -62,27 +62,29 @@ export class Player extends EventEmitter<{
 
   private async onclientclose() {
     delete this.client
-    console.log("Client disconnected")
     await this.kick("Disconnected")
   }
 
   async kick(reason?: string) {
+    const player = await this.info()
     await this.server.request("/player/kick", {
-      player: this.json,
+      player,
       reason
     })
   }
 
   async msg(message: string) {
+    const player = await this.info()
     await this.server.request("/player/message", {
-      player: this.json,
+      player,
       message
     })
   }
 
   async actionbar(message: string) {
+    const player = await this.info()
     await this.server.request("/player/actionbar", {
-      player: this.json,
+      player,
       message
     })
   }
@@ -92,8 +94,9 @@ export class Player extends EventEmitter<{
     subtitle: string,
     duration?: TitleDuration
   ) {
+    const player = await this.info()
     await this.server.request("/player/title", {
-      player: this.json,
+      player,
       title,
       subtitle,
       ...duration

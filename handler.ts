@@ -55,7 +55,7 @@ export class Handler extends EventEmitter<{
   private async onaccept(conn: WSConnection) {
     conn.on(["message"], console.log)
 
-    const [channel, hello] =
+    const { channel, data: hello } =
       await conn.wait<Hello>("/hello")
 
     if (hello.type === "server")

@@ -26,7 +26,7 @@ export class Client extends Connection<ClientEvents> {
   get hello() {
     return {
       ...super.hello,
-      player: this.player.json
+      player: this.player.info
     }
   }
 }

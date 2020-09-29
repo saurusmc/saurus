@@ -14,13 +14,18 @@ export class Close {
   constructor(readonly reason?: string) { }
 }
 
+export interface WSRequest<T = unknown> {
+  channel: WSChannel,
+  data: T
+}
+
 export class WSConnection extends EventEmitter<{
   message: [msg: WSMessage]
   close: [e: Close]
 }> {
 
   readonly channels = new EventEmitter<{
-    [path: string]: [channel: WSChannel, data: unknown]
+    [path: string]: [WSRequest]
   }>()
 
   constructor(
@@ -61,34 +66,34 @@ export class WSConnection extends EventEmitter<{
     if (msg.type === "open") {
       const { uuid, path, data } = msg;
       const channel = new WSChannel(this, uuid)
-      await this.channels.emit(path, channel, data)
+      await this.channels.emit(path, { channel, data })
     }
   }
 
   async read() {
-    if (this.closed)
-      throw new Error("Closed")
+    let off1: () => unknown
+    let off2: () => unknown
 
-    return await new Promise<WSMessage>((ok, err) => {
-      const off1 = this.once(["message"],
-        (msg) => { off2(); ok(msg) })
-
-      const off2 = this.once(["close"],
-        (close) => { off1(); err(close) })
+    const promise = new Promise<WSMessage>((ok, err) => {
+      off1 = this.once(["message"], ok)
+      off2 = this.once(["close"], err)
     })
+
+    const clean = () => { off1(); off2() }
+    return await promise.finally(clean)
   }
 
   async wait<T>(path: string) {
-    if (this.closed)
-      throw new Error("Closed")
+    let off1: () => unknown
+    let off2: () => unknown
 
-    return await new Promise<[WSChannel, T]>((ok, err) => {
-      const off1 = this.channels.once([path],
-        (c, d) => { off2(); ok([c, d as T]) })
+    const promise = new Promise<WSRequest>((ok, err) => {
+      off1 = this.channels.once([path], ok)
+      off2 = this.once(["close"], err)
+    }) as Promise<WSRequest<T>>
 
-      const off2 = this.once(["close"],
-        (close) => { off1(); err(close) })
-    })
+    const clean = () => { off1(); off2() }
+    return await promise.finally(clean)
   }
 
   async* listen<T>(path: string) {
