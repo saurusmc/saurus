@@ -96,13 +96,15 @@ export class Handler extends EventEmitter<{
       const token = UUID.generate()
       this.tokens.set(token, player)
 
-      player.once(["quit"],
-        () => this.tokens.delete(token))
-
       await channel.close({
         uuid: app.uuid,
         player: player.json,
         token
+      })
+
+      player.once(["quit"], async () => {
+        this.tokens.delete(token)
+        await app.conn.close("Quit")
       })
 
       await player.emit("authorize", app)
@@ -114,6 +116,10 @@ export class Handler extends EventEmitter<{
         uuid: app.uuid,
         player: player.json,
         token: hello.token
+      })
+
+      player.once(["quit"], async () => {
+        await app.conn.close("Quit")
       })
 
       await player.emit("authorize", app)
