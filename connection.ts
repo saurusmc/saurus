@@ -5,7 +5,7 @@ import type { WSConnection, Close } from "./websockets/connection.ts"
 import type { WSChannel } from "./websockets/channel.ts"
 
 export interface ConnectionEvents {
-  close: [e: Close]
+  close: Close
 }
 
 export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
@@ -16,16 +16,10 @@ export class Connection<E extends ConnectionEvents = ConnectionEvents> extends E
   ) {
     super()
 
-    conn.once(["close"], e => this.emit("close", e))
+    conn.once(["close"], this.reemit("close"))
   }
 
-  get hello() {
-    return {
-      uuid: this.uuid
-    }
-  }
-
-  get channels(){
+  get channels() {
     return this.conn.channels
   }
 

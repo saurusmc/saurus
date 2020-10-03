@@ -1,18 +1,19 @@
 
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
+import { Cancelled, EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
+import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
+import { Timeout } from "https://deno.land/x/timeout/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
-import { Client } from "./client.ts";
-import { Server } from "./server.ts";
+import { PlayerEvent, Server } from "./server.ts";
 
-import type { Player, UUID } from "./player.ts";
+import type { Player } from "./player.ts";
 import { App } from "./app.ts";
 
-import { HTTPSOptions, WSServer } from "./websockets/server.ts";
+import { ListenOptions, WSServer } from "./websockets/server.ts";
 import type { WSConnection } from "./websockets/connection.ts";
 import type { WSChannel } from "./websockets/channel.ts";
 
-export type Hello = ServerHello | ClientHello | AppHello
+export type Hello = ServerHello | AppHello
 
 export interface ServerHello {
   type: "server" | "proxy",
@@ -20,133 +21,113 @@ export interface ServerHello {
   password: string
 }
 
-export interface ClientHello {
-  type: "client",
+export interface AppHello {
+  type: "app",
+  token?: string
+}
+
+export interface CodeRequest {
+  player: Player
   code: string
 }
 
-export interface AppHello {
-  type: "app",
-  client: UUID
-  token: string
-}
-
-export interface HandlerOptions extends HTTPSOptions {
-  password: string
-}
-
 export class Handler extends EventEmitter<{
-  server: [Server]
+  code: CodeRequest
+  server: Server
 }> {
-  readonly server = new WSServer(this.options)
-
-  readonly clients = new Map<UUID, Client>()
-  readonly codes = new Map<string, Player>()
+  readonly codes = new Map<string, App>()
+  readonly tokens = new Map<string, Player>()
 
   constructor(
-    readonly options: HandlerOptions
+    readonly options: ListenOptions,
   ) {
     super()
 
-    this.server.on(["accept"], this.onaccept.bind(this))
+    const wss = new WSServer(options)
+    wss.on(["accept"], this.onaccept.bind(this))
+
     this.on(["server"], this.onserver.bind(this))
+  }
+
+  genCode() {
+    while (true) {
+      const code = new Random().string(6)
+      if (!this.codes.has(code)) return code
+    }
   }
 
   private async onaccept(conn: WSConnection) {
     conn.on(["message"], console.log)
 
-    const { channel, data: hello } =
-      await conn.wait<Hello>("/hello")
+    for await (const hello of conn.listen<Hello>("/hello")) {
+      const { channel, data } = hello;
 
-    if (hello.type === "server")
-      await this.handleserver(channel, hello)
-
-    if (hello.type === "client")
-      await this.handleclient(channel, hello)
-
-    if (hello.type === "app")
-      await this.handleapp(channel, hello)
-
-    if (hello.type === "proxy")
-      await this.handleproxy(channel, hello)
+      try {
+        if (data.type === "server")
+          await this.handleserver(channel, data)
+        if (data.type === "app")
+          await this.handleapp(channel, data)
+      } catch (e) {
+        if (e instanceof Error)
+          await channel.close(e.message)
+      }
+    }
   }
 
   private async handleserver(channel: WSChannel, hello: ServerHello) {
     const { password, platform } = hello
-
-    if (password !== this.options.password)
-      throw new Error("Bad password");
-
-    const server = new Server(channel.conn, platform)
-    await channel.close(server.hello)
-
+    const server = new Server(channel.conn, platform, password)
+    await channel.close({ uuid: server.uuid })
     await this.emit("server", server)
   }
 
-  private async handleclient(channel: WSChannel, hello: ClientHello) {
-    const { code } = hello;
-
-    const player = this.codes.get(code)
-    if (!player) throw new Error("Invalid")
-
-    const client = new Client(channel.conn, player)
-    this.clients.set(client.uuid, client)
-    await channel.close(client.hello)
-    await player.emit("connect", client)
-  }
-
   private async handleapp(channel: WSChannel, hello: AppHello) {
-    const client = this.clients.get(hello.client)
-    if (!client) throw new Error("Invalid")
+    const app = new App(channel.conn)
 
-    const result: boolean =
-      await client.request("/authorize", hello.token)
+    if (!hello.token) {
+      const code = this.genCode()
+      this.codes.set(code, app)
+      await channel.send(code)
 
-    if (!result) throw new Error("Refused")
+      const close = channel.error(["close"])
+      const promise = this.wait(["code"], e => e.code === code)
+      const { player } = await Timeout.race([promise, close], 60000)
 
-    const app = new App(channel.conn, client)
-    await channel.close(app.hello)
+      const token = UUID.generate()
+      this.tokens.set(token, player)
 
-    await client.emit("app", app)
-    console.log("App connected", app.player.name)
-  }
+      player.once(["quit"],
+        () => this.tokens.delete(token))
 
-  private async handleproxy(channel: WSChannel, hello: ServerHello) {
-    const { password, platform } = hello
+      await channel.close({
+        uuid: app.uuid,
+        player: player.json,
+        token
+      })
 
-    if (password !== this.options.password)
-      throw new Error("Bad password");
+      await player.emit("authorize", app)
+    } else {
+      const player = this.tokens.get(hello.token)
+      if (!player) throw new Error("Invalid token")
 
-    console.log("Proxy connected", platform)
-  }
+      await channel.close({
+        uuid: app.uuid,
+        player: player.json,
+        token: hello.token
+      })
 
-  gen() {
-    while (true) {
-      const code = new Random().string(6)
-      if (!this.codes.get(code)) return code
+      await player.emit("authorize", app)
     }
   }
 
   private async onserver(server: Server) {
-    server.players.on(["join"], (player) => {
-      const code = this.gen()
-      this.codes.set(code, player)
-
-      const show = () => player.actionbar(`Code: ${code}`)
-      const kick = () => player.kick("Not connected")
-
-      const t = setTimeout(kick, 60 * 1000)
-      const i = setInterval(show, 1 * 1000)
-
-      const clean = () => {
-        this.codes.delete(code)
-        clearTimeout(t)
-        clearInterval(i)
-      }
-
-      player.once(["connect"], clean)
-      player.once(["quit"], clean)
-      server.once(["close"], clean)
+    const off = server.events.on(["player.code"], async (e) => {
+      const { player: { uuid }, code } = e
+      const player = server.players.uuids.get(uuid)
+      if (!player) throw new Cancelled("Invalid player")
+      await this.emit("code", { player, code })
     })
+
+    server.once(["close"], off)
   }
 }

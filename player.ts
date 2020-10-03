@@ -1,7 +1,6 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import type { Server } from "./server.ts"
-import type { Client } from "./client.ts"
 import type { App } from "./app.ts"
 
 export interface TitleDuration {
@@ -10,81 +9,66 @@ export interface TitleDuration {
   fadeout: number
 }
 
-export type UUID = string;
-
 export interface PlayerInfo {
   [x: string]: unknown,
   name: string,
-  uuid: UUID
+  uuid: string
 }
 
 export class Player extends EventEmitter<{
-  connect: [Client]
-  info: [PlayerInfo]
-  death: []
-  quit: []
+  info: PlayerInfo
+
+  death: void
+  quit: void
+
+  authorize: App
 }> {
-  client?: Client
+  tokens = new Set<string>()
 
   constructor(
     readonly server: Server,
     readonly name: string,
-    readonly uuid: UUID
+    readonly uuid: string
   ) {
     super()
 
     server.on(["close"], this.onserverclose.bind(this))
 
     this.on(["death"], () => this.actionbar("Haha!"))
-    this.on(["connect"], this.onconnect.bind(this))
   }
 
-  async info(extras = false) {
+  get json() {
     const { name, uuid } = this;
-    const info = { name, uuid }
+    return { name, uuid }
+  }
 
-    if (extras)
-      await this.emit("info", info)
-
+  info() {
+    const info = this.json
+    this.emitSync("info", info)
     return info
   }
 
-  private async onconnect(client: Client) {
-    this.client = client;
-    client.once(["close"],
-      this.onclientclose.bind(this))
-    await this.actionbar("Connected")
-  }
-
   private async onserverclose() {
-    await this.emit("quit")
-  }
-
-  private async onclientclose() {
-    delete this.client
-    await this.kick("Disconnected")
+    await this.emit("quit", undefined)
   }
 
   async kick(reason?: string) {
-    const player = await this.info()
     await this.server.request("/player/kick", {
-      player,
+      player: this.json,
       reason
     })
   }
 
   async msg(message: string) {
-    const player = await this.info()
     await this.server.request("/player/message", {
-      player,
+      player: this.json,
       message
     })
   }
 
   async actionbar(message: string) {
-    const player = await this.info()
     await this.server.request("/player/actionbar", {
-      player,
+      player: this.json,
       message
     })
   }
@@ -94,9 +78,8 @@ export class Player extends EventEmitter<{
     subtitle: string,
     duration?: TitleDuration
   ) {
-    const player = await this.info()
     await this.server.request("/player/title", {
-      player,
+      player: this.json,
       title,
       subtitle,
       ...duration

@@ -1,4 +1,5 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
+import { Abort } from "https://deno.land/x/abortable/mod.ts";
 import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
 
 import type { WSMessage } from "./message.ts";
@@ -6,8 +7,8 @@ import type { WSMessage } from "./message.ts";
 import { Close, WSConnection } from "./connection.ts";
 
 export class WSChannel extends EventEmitter<{
-  message: [data: unknown]
-  close: [e: Close]
+  message: unknown
+  close: Close
 }> {
   constructor(
     readonly conn: WSConnection,
@@ -18,7 +19,7 @@ export class WSChannel extends EventEmitter<{
     const offmessage = conn.on(["message"],
       this.onmessage.bind(this))
 
-    conn.once(["close"], c => this.emit("close", c))
+    conn.once(["close"], this.reemit("close"))
     this.once(["close"], offmessage)
   }
 
@@ -53,7 +54,7 @@ export class WSChannel extends EventEmitter<{
     await conn.send({ uuid, type: "close", data })
   }
 
-  async error(reason?: string) {
+  async throw(reason?: string) {
     const { conn, uuid } = this;
     await conn.send({ uuid, type: "error", reason })
   }
@@ -64,15 +65,19 @@ export class WSChannel extends EventEmitter<{
   }
 
   async read<T = unknown>() {
-    let off1: () => unknown
-    let off2: () => unknown
+    const message = this.wait(["message"])
+    const close = this.error(["close"])
+    const data = await Abort.race([message, close])
+    return data as T
+  }
 
-    const promise = new Promise<unknown>((ok, err) => {
-      off1 = this.once(["message"], ok)
-      off2 = this.once(["close"], err)
-    }) as Promise<T>
+  async request<T = unknown>(request: unknown) {
+    const message = this.wait(["close"])
+    const close = this.error(["close"])
 
-    const clean = () => { off1(); off2() }
-    return await promise.finally(clean)
+    await this.send(request)
+
+    const response = await Abort.race([message, close])
+    return response as T
   }
 }
