@@ -74,6 +74,7 @@ export class Handler extends EventEmitter<{
         if (data.type === "app")
           await this.handleapp(channel, data)
       } catch (e) {
+        console.error(e)
         if (e instanceof Error)
           await channel.close(e.message)
       }

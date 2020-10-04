@@ -71,13 +71,8 @@ export class WSChannel extends EventEmitter<{
     return data as T
   }
 
-  async request<T = unknown>(request: unknown) {
-    const message = this.wait(["message"])
-    const close = this.error(["close"])
-
+  async request<T = unknown>(request?: unknown) {
     await this.send(request)
-
-    const response = await Abort.race([message, close])
-    return response as T
+    return await this.read<T>()
   }
 }
