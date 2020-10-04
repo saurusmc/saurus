@@ -72,7 +72,7 @@ export class WSChannel extends EventEmitter<{
   }
 
   async request<T = unknown>(request: unknown) {
-    const message = this.wait(["close"])
+    const message = this.wait(["message"])
     const close = this.error(["close"])
 
     await this.send(request)

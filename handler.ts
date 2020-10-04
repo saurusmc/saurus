@@ -6,7 +6,7 @@ import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
 import { PlayerEvent, Server } from "./server.ts";
 
-import type { Player } from "./player.ts";
+import type { Player, PlayerInfo } from "./player.ts";
 import { App } from "./app.ts";
 
 import { ListenOptions, WSServer } from "./websockets/server.ts";
@@ -24,6 +24,12 @@ export interface ServerHello {
 export interface AppHello {
   type: "app",
   token?: string
+}
+
+export interface AppWelcome {
+  uuid: string,
+  player: PlayerInfo,
+  token: string
 }
 
 export interface CodeRequest {
@@ -96,11 +102,13 @@ export class Handler extends EventEmitter<{
       const token = UUID.generate()
       this.tokens.set(token, player)
 
-      await channel.close({
+      const welcome: AppWelcome = {
         uuid: app.uuid,
         player: player.json,
         token
-      })
+      }
+
+      await channel.close(welcome)
 
       player.once(["quit"], async () => {
         this.tokens.delete(token)
@@ -112,15 +120,16 @@ export class Handler extends EventEmitter<{
       const player = this.tokens.get(hello.token)
       if (!player) throw new Error("Invalid token")
 
-      await channel.close({
+      const welcome: AppWelcome = {
         uuid: app.uuid,
         player: player.json,
         token: hello.token
-      })
+      }
 
-      player.once(["quit"], async () => {
-        await app.conn.close("Quit")
-      })
+      await channel.close(welcome)
+
+      player.once(["quit"],
+        () => app.conn.close("Quit"))
 
       await player.emit("authorize", app)
     }
