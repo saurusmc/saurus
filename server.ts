@@ -56,4 +56,7 @@ export class Server extends Connection {
     return await this.request<boolean>("/execute", command)
   }
 
+  list() {
+    return this.players.list()
+  }
 }

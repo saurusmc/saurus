@@ -15,7 +15,7 @@ export class Close {
   constructor(readonly reason?: string) { }
 }
 
-export interface WSRequest<T = unknown> {
+export interface Message<T = unknown> {
   channel: WSChannel,
   data: T
 }
@@ -26,7 +26,7 @@ export class WSConnection extends EventEmitter<{
 }> {
 
   readonly channels = new EventEmitter<{
-    [path: string]: WSRequest
+    [path: string]: Message
   }>()
 
   constructor(
@@ -38,7 +38,14 @@ export class WSConnection extends EventEmitter<{
   }
 
   async *[Symbol.asyncIterator]() {
-    while (true) yield await this.read()
+    while (true) {
+      try {
+        yield await this.read()
+      } catch (e) {
+        if (e instanceof Close) return;
+        throw e
+      }
+    }
   }
 
   get closed() {
@@ -95,10 +102,15 @@ export class WSConnection extends EventEmitter<{
 
   async* listen<T = unknown>(path: string) {
     while (true) {
-      const message = this.channels.wait([path])
-      const close = this.error(["close"])
-      const data = await Abort.race([message, close])
-      yield data as WSRequest<T>
+      try {
+        const message = this.channels.wait([path])
+        const close = this.error(["close"])
+        const data = await Abort.race([message, close])
+        yield data as Message<T>
+      } catch (e) {
+        if (e instanceof Close) return;
+        throw e
+      }
     }
   }
 
@@ -108,9 +120,11 @@ export class WSConnection extends EventEmitter<{
     return channel
   }
 
-  async request<T>(path: string, data?: unknown) {
+  async request<T>(path: string, req?: unknown) {
     const channel = new WSChannel(this)
-    await channel.open(path, data)
-    return await channel.read<T>()
+    await channel.open(path, req)
+    const res = await channel.read<T>()
+    return res;
+    // return { channel, data: res } as Message<T>;
   }
 }
