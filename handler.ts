@@ -112,7 +112,7 @@ export class Handler extends EventEmitter<{
 
       player.once(["quit"], async () => {
         this.tokens.delete(token)
-        await app.conn.close("Quit")
+        await app.conn.close("Quit").catch()
       })
 
       this.listenlist(player, app)
@@ -130,7 +130,7 @@ export class Handler extends EventEmitter<{
       await channel.close(welcome)
 
       player.once(["quit"],
-        () => app.conn.close("Quit"))
+        () => app.conn.close("Quit").catch())
 
       this.listenlist(player, app)
       await player.emit("authorize", app)
