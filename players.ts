@@ -1,57 +1,46 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
-import type { Server, PlayerEvent } from "./server.ts"
-import { Player, PlayerInfo } from "./player.ts"
+import type { PlayerEvent, Server } from "./server.ts"
+import { ServerPlayer, PlayerInfo } from "./player.ts"
 
-export class Players extends EventEmitter<{
-  join: Player
-  quit: Player
-}>{
-  uuids = new Map<string, Player>()
-  names = new Map<string, Player>()
+export interface PlayersEvents {
+  join: ServerPlayer
+  quit: ServerPlayer
+}
 
-  constructor(
-    readonly server: Server
-  ) {
+export class Players extends EventEmitter<PlayersEvents> {
+  uuids = new Map<string, ServerPlayer>()
+  names = new Map<string, ServerPlayer>()
+
+  constructor(readonly server: Server) {
     super()
 
-    this.listenEvents()
+    const offjoin = server.events.on(["player.join"],
+      this.onjoin.bind(this))
+
+    const offquit = server.events.on(["player.quit"],
+      this.onquit.bind(this))
 
     const offlist = server.channels.on(["/players/list"],
       ({ channel }) => channel.close(this.list()))
 
-    server.once(["close"], offlist)
-  }
-
-  private listenEvents() {
-    const { server } = this
-    const { events } = server
-
-    const offjoin = events.on(["player.join"],
-      this.onjoin.bind(this))
-
-    const offquit = events.on(["player.quit"],
-      this.onquit.bind(this))
-
-    const offdeath = events.on(["player.death"],
-      this.ondeath.bind(this))
-
-    server.once(["close"],
-      () => { offjoin(); offquit(); offdeath() })
+    server.once(["close"], offjoin, offquit, offlist)
   }
 
   list() {
     const infos = new Array<PlayerInfo>()
     for (const player of this.uuids.values())
-      infos.push(player.info())
+      infos.push(player.extras())
     return infos
   }
 
-  private async onjoin(e: PlayerEvent) {
-    const { server } = this;
-    const { name, uuid } = e.player;
+  get(player: PlayerInfo) {
+    return this.uuids.get(player.uuid) || this.names.get(player.name)
+  }
 
-    const player = new Player(server, name, uuid)
+  async onjoin(e: PlayerEvent) {
+    const { name, uuid } = e.player;
+    const player = new ServerPlayer(this.server, name, uuid)
     const cancelled = await this.emit("join", player)
 
     if (cancelled) {
@@ -62,9 +51,8 @@ export class Players extends EventEmitter<{
     }
   }
 
-  private async onquit(e: PlayerEvent) {
+  async onquit(e: PlayerEvent) {
     const { name, uuid } = e.player;
-
     const player = this.uuids.get(uuid)!!
     if (player.name !== name) return;
 
@@ -73,14 +61,5 @@ export class Players extends EventEmitter<{
 
     await this.emit("quit", player)
     await player.emit("quit", undefined)
-  }
-
-  private async ondeath(e: PlayerEvent) {
-    const { name, uuid } = e.player;
-
-    const player = this.uuids.get(uuid)!!
-    if (player.name !== name) return;
-
-    await player.emit("death", undefined);
   }
 }

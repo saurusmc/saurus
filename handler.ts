@@ -4,9 +4,9 @@ import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
 import { Timeout } from "https://deno.land/x/timeout/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
-import { PlayerEvent, Server } from "./server.ts";
+import { Server } from "./server.ts";
 
-import type { Player, PlayerInfo } from "./player.ts";
+import type { ServerPlayer, PlayerInfo } from "./player.ts";
 import { App } from "./app.ts";
 
 import { ListenOptions, WSServer } from "./websockets/server.ts";
@@ -33,7 +33,7 @@ export interface AppWelcome {
 }
 
 export interface CodeRequest {
-  player: Player
+  player: ServerPlayer
   code: string
 }
 
@@ -42,7 +42,7 @@ export class Handler extends EventEmitter<{
   server: Server
 }> {
   readonly codes = new Map<string, App>()
-  readonly tokens = new Map<string, Player>()
+  readonly tokens = new Map<string, ServerPlayer>()
 
   constructor(
     readonly options: ListenOptions,
@@ -148,7 +148,7 @@ export class Handler extends EventEmitter<{
     server.once(["close"], off)
   }
 
-  private async listenlist(player: Player, app: App) {
+  private async listenlist(player: ServerPlayer, app: App) {
     const offlist = app.channels.on(["/server/list"], async ({ channel }) => {
       const list = player.server.list()
       console.log(list)

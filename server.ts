@@ -36,10 +36,10 @@ export class Server extends Connection {
   ) {
     super(conn)
 
-    this.listenEvents()
+    this.listenevents()
   }
 
-  private async listenEvents() {
+  private async listenevents() {
     const events = await this.open("/events")
 
     const off = events.on(["message"],
@@ -58,5 +58,9 @@ export class Server extends Connection {
 
   list() {
     return this.players.list()
+  }
+
+  player(player: PlayerInfo) {
+    return this.players.get(player)
   }
 }

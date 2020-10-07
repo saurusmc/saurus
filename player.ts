@@ -1,5 +1,6 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
+import type { Extra } from "./saurus.ts"
 import type { Server } from "./server.ts"
 import type { App } from "./app.ts"
 
@@ -10,19 +11,16 @@ export interface TitleDuration {
 }
 
 export interface PlayerInfo {
-  [x: string]: unknown,
   name: string,
   uuid: string
 }
 
-export class Player extends EventEmitter<{
-  info: PlayerInfo
-
+export class ServerPlayer extends EventEmitter<{
+  extras: Extra<PlayerInfo>
+  authorize: App
   death: void
   quit: void
-
-  authorize: App
-}> {
+}>  {
   tokens = new Set<string>()
 
   constructor(
@@ -32,9 +30,12 @@ export class Player extends EventEmitter<{
   ) {
     super()
 
-    server.on(["close"], this.onserverclose.bind(this))
+    server.once(["close"], this.onserverclose.bind(this))
 
-    this.on(["death"], () => this.actionbar("Haha!"))
+    server.events.on(["player.death"], async (e) => {
+      if (e.player.uuid !== this.uuid) return
+      await this.emit("death", undefined)
+    })
   }
 
   get json() {
@@ -42,9 +43,9 @@ export class Player extends EventEmitter<{
     return { name, uuid }
   }
 
-  info() {
+  extras() {
     const info = this.json
-    this.emitSync("info", info)
+    this.emitSync("extras", info)
     return info
   }
 

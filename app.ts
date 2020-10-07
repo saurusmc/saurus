@@ -7,9 +7,5 @@ export class App extends Connection {
     readonly conn: WSConnection,
   ) {
     super(conn)
-
-    conn.channels.on(["/players/list"], async ({ channel }) => {
-      // await channel.close(this.server.players.list())
-    })
   }
 }
