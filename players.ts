@@ -1,16 +1,16 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import type { PlayerEvent, Server } from "./server.ts"
-import { ServerPlayer, PlayerInfo } from "./player.ts"
+import { Player, PlayerInfo } from "./player.ts"
 
 export interface PlayersEvents {
-  join: ServerPlayer
-  quit: ServerPlayer
+  join: Player
+  quit: Player
 }
 
 export class Players extends EventEmitter<PlayersEvents> {
-  uuids = new Map<string, ServerPlayer>()
-  names = new Map<string, ServerPlayer>()
+  uuids = new Map<string, Player>()
+  names = new Map<string, Player>()
 
   constructor(readonly server: Server) {
     super()
@@ -40,7 +40,7 @@ export class Players extends EventEmitter<PlayersEvents> {
 
   async onjoin(e: PlayerEvent) {
     const { name, uuid } = e.player;
-    const player = new ServerPlayer(this.server, name, uuid)
+    const player = new Player(this.server, name, uuid)
     const cancelled = await this.emit("join", player)
 
     if (cancelled) {

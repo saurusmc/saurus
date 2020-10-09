@@ -15,7 +15,7 @@ export interface PlayerInfo {
   uuid: string
 }
 
-export class ServerPlayer extends EventEmitter<{
+export class Player extends EventEmitter<{
   extras: Extra<PlayerInfo>
   authorize: App
   death: void

@@ -60,6 +60,8 @@ export class WSConnection extends EventEmitter<{
         if (typeof e !== "string") continue;
         this.onmessage(JSON.parse(e) as WSMessage)
       }
+
+      await this.emit("close", new Close("Unknown"))
     } catch (e) {
       if (isWebSocketCloseEvent(e))
         await this.emit("close", new Close(e.reason))

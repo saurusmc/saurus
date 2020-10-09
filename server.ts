@@ -31,6 +31,7 @@ export class Server extends Connection {
 
   constructor(
     readonly conn: WSConnection,
+    readonly name: string,
     readonly platform: string,
     readonly password: string,
   ) {

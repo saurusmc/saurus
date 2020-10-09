@@ -71,6 +71,7 @@ export class WSServer extends EventEmitter<{
 
         this.onaccept(new WSConnection(socket));
       } catch (e) {
+        console.error(e)
         await req.respond({ status: 400 });
       }
     }

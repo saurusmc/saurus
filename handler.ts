@@ -6,7 +6,7 @@ import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
 import { Server } from "./server.ts";
 
-import type { ServerPlayer, PlayerInfo } from "./player.ts";
+import type { Player, PlayerInfo } from "./player.ts";
 import { App } from "./app.ts";
 
 import { ListenOptions, WSServer } from "./websockets/server.ts";
@@ -17,8 +17,9 @@ export type Hello = ServerHello | AppHello
 
 export interface ServerHello {
   type: "server" | "proxy",
-  platform: string
-  password: string
+  name: string,
+  platform: string,
+  password: string,
 }
 
 export interface AppHello {
@@ -33,7 +34,7 @@ export interface AppWelcome {
 }
 
 export interface CodeRequest {
-  player: ServerPlayer
+  player: Player
   code: string
 }
 
@@ -42,7 +43,7 @@ export class Handler extends EventEmitter<{
   server: Server
 }> {
   readonly codes = new Map<string, App>()
-  readonly tokens = new Map<string, ServerPlayer>()
+  readonly tokens = new Map<string, Player>()
 
   constructor(
     readonly options: ListenOptions,
@@ -81,8 +82,8 @@ export class Handler extends EventEmitter<{
   }
 
   private async handleserver(channel: WSChannel, hello: ServerHello) {
-    const { password, platform } = hello
-    const server = new Server(channel.conn, platform, password)
+    const { name, password, platform } = hello
+    const server = new Server(channel.conn, name, platform, password)
     await channel.close({ uuid: server.uuid })
     await this.emit("server", server)
   }
@@ -148,7 +149,7 @@ export class Handler extends EventEmitter<{
     server.once(["close"], off)
   }
 
-  private async listenlist(player: ServerPlayer, app: App) {
+  private async listenlist(player: Player, app: App) {
     const offlist = app.channels.on(["/server/list"], async ({ channel }) => {
       const list = player.server.list()
       console.log(list)
