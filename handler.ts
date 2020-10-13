@@ -38,6 +38,10 @@ export interface CodeRequest {
   code: string
 }
 
+export interface HandlerOptions extends ListenOptions {
+  debug?: boolean,
+}
+
 export class Handler extends EventEmitter<{
   code: CodeRequest
   server: Server
@@ -46,7 +50,7 @@ export class Handler extends EventEmitter<{
   readonly tokens = new Map<string, Player>()
 
   constructor(
-    readonly options: ListenOptions,
+    readonly options: HandlerOptions,
   ) {
     super()
 
@@ -56,7 +60,7 @@ export class Handler extends EventEmitter<{
     this.on(["server"], this.onserver.bind(this))
   }
 
-  genCode() {
+  private genCode() {
     while (true) {
       const code = new Random().string(6)
       if (!this.codes.has(code)) return code
@@ -64,7 +68,10 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
-    conn.on(["message"], console.log)
+    if (this.options.debug) {
+      const off = conn.on(["message"], console.debug)
+      conn.once(["close"], off)
+    }
 
     for await (const hello of conn.listen<Hello>("/hello")) {
       const { channel, data } = hello;
@@ -103,6 +110,9 @@ export class Handler extends EventEmitter<{
       const token = UUID.generate()
       this.tokens.set(token, player)
 
+      player.once(["quit"],
+        () => this.tokens.delete(token))
+
       const welcome: AppWelcome = {
         uuid: app.uuid,
         player: player.json,
@@ -110,13 +120,6 @@ export class Handler extends EventEmitter<{
       }
 
       await channel.close(welcome)
-
-      player.once(["quit"], async () => {
-        this.tokens.delete(token)
-        await app.conn.close("Quit").catch()
-      })
-
-      this.listenlist(player, app)
       await player.emit("authorize", app)
     } else {
       const player = this.tokens.get(hello.token)
@@ -129,11 +132,6 @@ export class Handler extends EventEmitter<{
       }
 
       await channel.close(welcome)
-
-      player.once(["quit"],
-        () => app.conn.close("Quit").catch())
-
-      this.listenlist(player, app)
       await player.emit("authorize", app)
     }
   }
@@ -147,15 +145,5 @@ export class Handler extends EventEmitter<{
     })
 
     server.once(["close"], off)
-  }
-
-  private async listenlist(player: Player, app: App) {
-    const offlist = app.channels.on(["/server/list"], async ({ channel }) => {
-      const list = player.server.list()
-      console.log(list)
-      await channel.close(list)
-    })
-
-    app.once(["close"], offlist)
   }
 }

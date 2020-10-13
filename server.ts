@@ -10,21 +10,50 @@ export interface Event {
   event: string
 }
 
-export interface PlayerEvent extends Event {
-  player: PlayerInfo
+export interface Location {
+  x: number
+  y: number
+  z: number
 }
 
-export interface CodeEvent extends PlayerEvent {
+export interface PlayerEvent extends Event {
+  player: PlayerInfo
+  location: Location
+}
+
+export interface PlayerMessageEvent extends PlayerEvent {
+  message: string
+}
+
+export interface PlayerRespawnEvent extends PlayerEvent {
+  anchor: boolean
+  bed: boolean
+}
+
+export interface PlayerMoveEvent extends PlayerEvent {
+  from: Location
+  to: Location
+}
+
+export interface PlayerChatEvent extends PlayerEvent {
+  format: string,
+  message: string
+}
+
+export interface PlayerCodeEvent extends PlayerEvent {
   code: string
 }
 
 export class Server extends Connection {
   events = new EventEmitter<{
-    "player.join": PlayerEvent
-    "player.quit": PlayerEvent
-    "player.death": PlayerEvent
-    "player.code": CodeEvent
     [x: string]: {}
+    "player.join": PlayerMessageEvent
+    "player.quit": PlayerMessageEvent
+    "player.death": PlayerMessageEvent
+    "player.respawn": PlayerRespawnEvent
+    "player.move": PlayerMoveEvent
+    "player.chat": PlayerChatEvent
+    "player.code": PlayerCodeEvent
   }>()
 
   players = new Players(this)
@@ -55,13 +84,5 @@ export class Server extends Connection {
 
   async execute(command: string) {
     return await this.request<boolean>("/execute", command)
-  }
-
-  list() {
-    return this.players.list()
-  }
-
-  player(player: PlayerInfo) {
-    return this.players.get(player)
   }
 }

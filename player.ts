@@ -1,7 +1,7 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import type { Extra } from "./saurus.ts"
-import type { Server } from "./server.ts"
+import type { PlayerChatEvent, PlayerEvent, PlayerMessageEvent, Server } from "./server.ts"
 import type { App } from "./app.ts"
 
 export interface TitleDuration {
@@ -20,6 +20,7 @@ export class Player extends EventEmitter<{
   authorize: App
   death: void
   quit: void
+  chat: string
 }>  {
   tokens = new Set<string>()
 
@@ -30,12 +31,19 @@ export class Player extends EventEmitter<{
   ) {
     super()
 
-    server.once(["close"], this.onserverclose.bind(this))
+    const offclose = server.once(["close"],
+      this.onserverclose.bind(this))
 
-    server.events.on(["player.death"], async (e) => {
-      if (e.player.uuid !== this.uuid) return
-      await this.emit("death", undefined)
-    })
+    const offdeath = server.events.on(["player.death"],
+      this.ondeathevent.bind(this))
+
+    const offchat = server.events.on(["player.chat"],
+      this.onchatevent.bind(this))
+
+    const offapp = this.on(["authorize"],
+      this.onauthorize.bind(this))
+
+    this.once(["quit"], offclose, offdeath, offapp)
   }
 
   get json() {
@@ -51,6 +59,28 @@ export class Player extends EventEmitter<{
 
   private async onserverclose() {
     await this.emit("quit", undefined)
+  }
+
+  private async ondeathevent(e: PlayerMessageEvent) {
+    if (e.player.uuid !== this.uuid) return
+    await this.emit("death", undefined)
+  }
+
+  private async onchatevent(e: PlayerChatEvent) {
+    if (e.player.uuid !== this.uuid) return
+    await this.emit("chat", e.message)
+  }
+
+  private async onauthorize(app: App) {
+    const offlist = app.channels.on(["/server/list"], async ({ channel }) => {
+      const list = this.server.players.list()
+      await channel.close(list)
+    })
+
+    this.once(["quit"],
+      () => app.conn.close("Quit").catch())
+
+    app.once(["close"], offlist)
   }
 
   async kick(reason?: string) {

@@ -5,6 +5,7 @@ import {
 } from "https://deno.land/std@0.65.0/ws/mod.ts";
 
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
+import { Timeout } from "https://deno.land/x/timeout/mod.ts"
 import { Abort } from "https://deno.land/x/abortable/mod.ts";
 
 import { WSChannel } from "./channel.ts";
@@ -96,10 +97,15 @@ export class WSConnection extends EventEmitter<{
     await this.emit("close", new Close(reason))
   }
 
-  async read() {
+  async read(timeout = false) {
     const message = this.wait(["message"])
     const close = this.error(["close"])
-    return await Abort.race([message, close])
+
+    if (timeout) {
+      return await Timeout.race([message, close], 1000)
+    } else {
+      return await Abort.race([message, close])
+    }
   }
 
   async* listen<T = unknown>(path: string) {
@@ -125,8 +131,7 @@ export class WSConnection extends EventEmitter<{
   async request<T>(path: string, req?: unknown) {
     const channel = new WSChannel(this)
     await channel.open(path, req)
-    const res = await channel.read<T>()
-    return res;
-    // return { channel, data: res } as Message<T>;
+    const res = await channel.read<T>(true)
+    return { channel, data: res } as Message<T>;
   }
 }
