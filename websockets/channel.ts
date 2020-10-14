@@ -1,7 +1,7 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
 import { Abort } from "https://deno.land/x/abortable/mod.ts";
 import { Timeout } from "https://deno.land/x/timeout/mod.ts";
-import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
+import * as UUID from "https://deno.land/std/uuid/v4.ts"
 
 import type { WSMessage } from "./message.ts";
 
@@ -65,21 +65,16 @@ export class WSChannel extends EventEmitter<{
     await conn.send({ uuid, data })
   }
 
-  async read<T = unknown>(timeout = false) {
+  async read<T = unknown>(delay = 0) {
     const message = this.wait(["message"])
     const close = this.error(["close"])
+    const promises = [message, close]
 
-    if (timeout) {
-      const data = await Timeout.race([message, close], 1000)
-      return data as T
-    } else {
-      const data = await Abort.race([message, close])
-      return data as T
+    if (delay > 0) {
+      const timeout = Timeout.error(delay)
+      promises.push(timeout)
     }
-  }
 
-  async request<T = unknown>(request?: unknown) {
-    await this.send(request)
-    return await this.read<T>(true)
+    return await Abort.race(promises) as T
   }
 }

@@ -1,19 +1,11 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
 import type { Extra } from "./saurus.ts"
-import type { PlayerChatEvent, PlayerEvent, PlayerMessageEvent, Server } from "./server.ts"
+import type { Server } from "./server.ts"
 import type { App } from "./app.ts"
 
-export interface TitleDuration {
-  fadein: number,
-  stay: number
-  fadeout: number
-}
-
-export interface PlayerInfo {
-  name: string,
-  uuid: string
-}
+import type { PlayerChatEvent, PlayerMessageEvent } from "./events.ts"
+import type { PlayerInfo } from "./types.ts"
 
 export class Player extends EventEmitter<{
   extras: Extra<PlayerInfo>
@@ -107,7 +99,11 @@ export class Player extends EventEmitter<{
   async title(
     title: string,
     subtitle: string,
-    duration?: TitleDuration
+    duration?: {
+      fadein: number,
+      stay: number
+      fadeout: number
+    }
   ) {
     await this.server.request("/player/title", {
       player: this.json,

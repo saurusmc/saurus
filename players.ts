@@ -1,7 +1,9 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 
-import type { PlayerEvent, Server } from "./server.ts"
-import { Player, PlayerInfo } from "./player.ts"
+import type { Server } from "./server.ts"
+import { Player } from "./player.ts"
+import { PlayerInfo } from "./types.ts"
+import { PlayerMessageEvent } from "./events.ts"
 
 export interface PlayersEvents {
   join: Player
@@ -38,7 +40,7 @@ export class Players extends EventEmitter<PlayersEvents> {
     return this.uuids.get(player.uuid) || this.names.get(player.name)
   }
 
-  async onjoin(e: PlayerEvent) {
+  async onjoin(e: PlayerMessageEvent) {
     const { name, uuid } = e.player;
     const player = new Player(this.server, name, uuid)
     const cancelled = await this.emit("join", player)
@@ -51,7 +53,7 @@ export class Players extends EventEmitter<PlayersEvents> {
     }
   }
 
-  async onquit(e: PlayerEvent) {
+  async onquit(e: PlayerMessageEvent) {
     const { name, uuid } = e.player;
     const player = this.uuids.get(uuid)!!
     if (player.name !== name) return;

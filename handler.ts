@@ -1,17 +1,18 @@
 
 import { Cancelled, EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
-import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
+import * as UUID from "https://deno.land/std/uuid/v4.ts"
 import { Timeout } from "https://deno.land/x/timeout/mod.ts"
 import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
 
 import { Server } from "./server.ts";
 
-import type { Player, PlayerInfo } from "./player.ts";
+import type { Player } from "./player.ts";
 import { App } from "./app.ts";
 
 import { ListenOptions, WSServer } from "./websockets/server.ts";
 import type { WSConnection } from "./websockets/connection.ts";
 import type { WSChannel } from "./websockets/channel.ts";
+import type { PlayerInfo } from "./types.ts";
 
 export type Hello = ServerHello | AppHello
 

@@ -1,8 +1,11 @@
 import {
   WebSocket,
   isWebSocketPingEvent,
-  isWebSocketCloseEvent
-} from "https://deno.land/std@0.65.0/ws/mod.ts";
+  isWebSocketCloseEvent,
+  isWebSocketPongEvent,
+  WebSocketPingEvent,
+  WebSocketPongEvent
+} from "https://deno.land/std/ws/mod.ts";
 
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
 import { Timeout } from "https://deno.land/x/timeout/mod.ts"
@@ -21,11 +24,14 @@ export interface Message<T = unknown> {
   data: T
 }
 
-export class WSConnection extends EventEmitter<{
+export interface WSConnectionEvents {
+  ping: WebSocketPingEvent
+  pong: WebSocketPongEvent
   message: WSMessage
   close: Close
-}> {
+}
 
+export class WSConnection extends EventEmitter<WSConnectionEvents> {
   readonly channels = new EventEmitter<{
     [path: string]: Message
   }>()
@@ -34,6 +40,10 @@ export class WSConnection extends EventEmitter<{
     readonly socket: WebSocket
   ) {
     super();
+
+    const off = this.on(["message"],
+      this.onmessage.bind(this))
+    this.once(["close"], off)
 
     this._listen()
   }
@@ -56,24 +66,33 @@ export class WSConnection extends EventEmitter<{
   private async _listen() {
     try {
       for await (const e of this.socket) {
-        if (isWebSocketCloseEvent(e)) throw e;
-        if (isWebSocketPingEvent(e)) continue;
-        if (typeof e !== "string") continue;
-        this.onmessage(JSON.parse(e) as WSMessage)
+        if (isWebSocketPingEvent(e))
+          this.emit("ping", e)
+
+        if (isWebSocketPongEvent(e))
+          this.emit("pong", e)
+
+        if (isWebSocketCloseEvent(e)) {
+          const close = new Close(e.reason)
+          await this.emit("close", close)
+          return;
+        }
+
+        if (typeof e === "string") {
+          const msg = JSON.parse(e) as WSMessage
+          this.emit("message", msg)
+        }
       }
 
-      await this.emit("close", new Close("Unknown"))
+      await this.emit("close", new Close())
     } catch (e) {
-      if (isWebSocketCloseEvent(e))
-        await this.emit("close", new Close(e.reason))
       if (e instanceof Error)
         await this.close(e.message)
+      else console.error(e)
     }
   }
 
   protected async onmessage(msg: WSMessage) {
-    await this.emit("message", msg)
-
     if (msg.type === "open") {
       const { uuid, path, data } = msg;
       const channel = new WSChannel(this, uuid)
@@ -122,16 +141,25 @@ export class WSConnection extends EventEmitter<{
     }
   }
 
+  /**
+   * Open a channel
+   * @param path Path
+   * @param data Data
+   */
   async open(path: string, data?: unknown) {
     const channel = new WSChannel(this)
     await channel.open(path, data)
     return channel
   }
 
-  async request<T>(path: string, req?: unknown) {
-    const channel = new WSChannel(this)
-    await channel.open(path, req)
-    const res = await channel.read<T>(true)
+  /**
+   * Open a channel and read it
+   * @param path Path
+   * @param req Data
+   */
+  async request<T>(path: string, req?: unknown, delay = 1000) {
+    const channel = await this.open(path, req)
+    const res = await channel.read<T>(delay)
     return { channel, data: res } as Message<T>;
   }
 }

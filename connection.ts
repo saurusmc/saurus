@@ -1,14 +1,13 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
-import * as UUID from "https://deno.land/std@0.70.0/uuid/v4.ts"
+import * as UUID from "https://deno.land/std/uuid/v4.ts"
 
-import type { WSConnection, Close } from "./websockets/connection.ts"
-import type { WSChannel } from "./websockets/channel.ts"
+import type { WSConnection, Close, } from "./websockets/connection.ts"
 
 export interface ConnectionEvents {
   close: Close
 }
 
-export class Connection<E extends ConnectionEvents = ConnectionEvents> extends EventEmitter<E> {
+export class Connection extends EventEmitter<ConnectionEvents> {
   readonly uuid = UUID.generate()
 
   constructor(
@@ -21,6 +20,10 @@ export class Connection<E extends ConnectionEvents = ConnectionEvents> extends E
 
   get channels() {
     return this.conn.channels
+  }
+
+  async close(reason?: string) {
+    await this.conn.close(reason);
   }
 
   async open(path: string, data?: unknown) {
