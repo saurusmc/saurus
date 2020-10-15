@@ -44,7 +44,7 @@ export class Server extends Connection {
       while (true) {
         await Timeout.wait(1000)
         await this.conn.socket.ping()
-        const pong = this.conn.wait(["ping"])
+        const pong = this.conn.wait(["pong"])
         const close = this.conn.error(["close"])
         const timeout = Timeout.error(5000)
         await Abort.race([pong, close, timeout])

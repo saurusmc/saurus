@@ -159,7 +159,6 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
    */
   async request<T>(path: string, req?: unknown, delay = 1000) {
     const channel = await this.open(path, req)
-    const res = await channel.read<T>(delay)
-    return { channel, data: res } as Message<T>;
+    return await channel.read<T>(delay)
   }
 }
