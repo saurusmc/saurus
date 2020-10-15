@@ -43,12 +43,11 @@ export class WSServer extends EventEmitter<{
   private async listen(options: HTTPOptions) {
     for await (const req of serve(options)) {
       try {
-        const { conn, r, w, headers } = req;
         const socket = await acceptWebSocket({
-          conn,
-          bufReader: r,
-          bufWriter: w,
-          headers,
+          conn: req.conn,
+          bufReader: req.r,
+          bufWriter: req.w,
+          headers: req.headers,
         })
 
         this.onaccept(new WSConnection(socket));
@@ -61,17 +60,15 @@ export class WSServer extends EventEmitter<{
   private async listenTLS(options: HTTPSOptions) {
     for await (const req of serveTLS(options)) {
       try {
-        const { conn, r, w, headers } = req;
         const socket = await acceptWebSocket({
-          conn,
-          bufReader: r,
-          bufWriter: w,
-          headers,
+          conn: req.conn,
+          bufReader: req.r,
+          bufWriter: req.w,
+          headers: req.headers,
         })
 
         this.onaccept(new WSConnection(socket));
       } catch (e) {
-        console.error(e)
         await req.respond({ status: 400 });
       }
     }
@@ -81,7 +78,6 @@ export class WSServer extends EventEmitter<{
     try {
       await this.emit("accept", conn)
     } catch (e) {
-      console.error(e)
       if (e instanceof Error)
         conn.close(e.message)
       else conn.close()

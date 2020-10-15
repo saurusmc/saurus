@@ -7,6 +7,9 @@ export class Console extends EventEmitter<{
   constructor() {
     super()
 
+    this.on(["command", "after"],
+      this.oncommand.bind(this))
+
     this.stdin()
   }
 
@@ -23,7 +26,23 @@ export class Console extends EventEmitter<{
   }
 
   private async stdin() {
-    for await (const line of readLines(Deno.stdin))
-      await this.emit("command", line)
+    for await (const line of readLines(Deno.stdin)) {
+      if (!line) continue
+
+      try {
+        const cancelled = await this.emit("command", line)
+        if (!cancelled) console.log("Couldn't handle this command")
+      } catch (e: unknown) {
+        console.error(e)
+      }
+    }
+  }
+
+  /**
+   * Default command handler
+   * @param command Command
+   */
+  private async oncommand(command: string) {
+    if (command === "exit") Deno.exit()
   }
 }
