@@ -1,10 +1,10 @@
 import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
 import * as UUID from "https://deno.land/std/uuid/v4.ts"
 
-import type { WSConnection, Close, } from "./websockets/connection.ts"
+import type { CloseError, WSConnection, } from "./websockets/connection.ts"
 
 export interface ConnectionEvents {
-  close: Close
+  close: CloseError
 }
 
 export class Connection extends EventEmitter<ConnectionEvents> {

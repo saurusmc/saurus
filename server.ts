@@ -14,16 +14,19 @@ export interface EventMessage {
   [x: string]: unknown
 }
 
+export interface ServerEvents {
+  [x: string]: unknown
+  "player.join": PlayerMessageEvent
+  "player.quit": PlayerMessageEvent
+  "player.death": PlayerMessageEvent
+  "player.respawn": PlayerRespawnEvent
+  "player.move": PlayerMoveEvent
+  "player.chat": PlayerChatEvent
+  "player.code": PlayerCodeEvent
+}
+
 export class Server extends Connection {
-  events = new EventEmitter<{
-    "player.join": PlayerMessageEvent
-    "player.quit": PlayerMessageEvent
-    "player.death": PlayerMessageEvent
-    "player.respawn": PlayerRespawnEvent
-    "player.move": PlayerMoveEvent
-    "player.chat": PlayerChatEvent
-    "player.code": PlayerCodeEvent
-  }>()
+  events = new EventEmitter<ServerEvents>()
 
   players = new Players(this)
 
@@ -60,7 +63,7 @@ export class Server extends Connection {
 
     const off = events.on(["message"], async (data) => {
       const { event, ...e } = data as EventMessage
-      await this.events.emit(event as any, e)
+      await this.events.emit(event, e)
     })
 
     events.once(["close"], off)

@@ -1,7 +1,13 @@
 import { readLines } from "https://deno.land/std/io/bufio.ts";
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
+import { Cancelled, EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
+
+export class Help {
+  readonly map = new Map<string, string>()
+  constructor(readonly prefix?: string) { }
+}
 
 export class Console extends EventEmitter<{
+  help: Help
   command: string
 }> {
   constructor() {
@@ -9,6 +15,9 @@ export class Console extends EventEmitter<{
 
     this.on(["command", "after"],
       this.oncommand.bind(this))
+
+    this.on(["help", "after"],
+      this.onhelp.bind(this))
 
     this.stdin()
   }
@@ -31,10 +40,19 @@ export class Console extends EventEmitter<{
 
       try {
         const cancelled = await this.emit("command", line)
-        if (!cancelled) console.log("Couldn't handle this command")
+        if (!cancelled) console.log(`Unknown command. Type "help" for help.`)
       } catch (e: unknown) {
         console.error(e)
       }
+    }
+  }
+
+  /**
+   * Default help handler
+   */
+  private async onhelp(help: Help) {
+    if (!help.prefix) {
+      help.map.set("exit", "Exit Saurus")
     }
   }
 
@@ -43,6 +61,33 @@ export class Console extends EventEmitter<{
    * @param command Command
    */
   private async oncommand(command: string) {
-    if (command === "exit") Deno.exit()
+    const [label, ...args] = command.split(" ")
+
+    if (label === "exit") {
+      Deno.exit()
+    }
+
+    if (label === "help") {
+      const prefix = args.join(" ")
+      const help = new Help(prefix)
+      await this.emit("help", help)
+
+      if (!help.map.size) {
+        if (!prefix)
+          console.log("Couldn't find commands")
+        else
+          console.log(`Couldn't find commands for "${prefix}"`)
+      } else {
+        if (!prefix)
+          console.log("Available commands:")
+        else
+          console.log(`Available commands for "${prefix}":`)
+
+        for (const key of help.map.keys())
+          console.log(key, "-", help.map.get(key))
+      }
+
+      throw new Cancelled("Help")
+    }
   }
 }

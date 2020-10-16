@@ -15,8 +15,10 @@ import { WSChannel } from "./channel.ts";
 
 import type { WSMessage } from "./message.ts";
 
-export class Close {
-  constructor(readonly reason?: string) { }
+export class CloseError extends Error {
+  constructor(readonly reason = "Unknown") {
+    super(`Closed (${reason})`)
+  }
 }
 
 export interface Message<T = unknown> {
@@ -28,7 +30,7 @@ export interface WSConnectionEvents {
   ping: WebSocketPingEvent
   pong: WebSocketPongEvent
   message: WSMessage
-  close: Close
+  close: CloseError
 }
 
 export class WSConnection extends EventEmitter<WSConnectionEvents> {
@@ -43,20 +45,10 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
 
     const off = this.on(["message"],
       this.onmessage.bind(this))
+
     this.once(["close"], off)
 
     this._listen()
-  }
-
-  async *[Symbol.asyncIterator]() {
-    while (true) {
-      try {
-        yield await this.read()
-      } catch (e) {
-        if (e instanceof Close) return;
-        throw e
-      }
-    }
   }
 
   get closed() {
@@ -73,8 +65,8 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
           this.emit("pong", e)
 
         if (isWebSocketCloseEvent(e)) {
-          const close = new Close(e.reason)
-          await this.emit("close", close)
+          const error = new CloseError(e.reason)
+          await this.emit("close", error)
           return;
         }
 
@@ -84,11 +76,12 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
         }
       }
 
-      await this.emit("close", new Close())
+      const error = new CloseError()
+      await this.emit("close", error)
     } catch (e) {
       if (e instanceof Error)
         await this.close(e.message)
-      else console.error(e)
+      else throw e
     }
   }
 
@@ -108,19 +101,19 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     await this.socket.send(text);
   }
 
-  async close(reason = "Unknown") {
+  async close(reason?: string) {
     if (this.closed)
       throw new Error("Closed")
 
-    await this.socket.close(1000, reason);
-    await this.emit("close", new Close(reason))
+    await this.socket.close(1000, reason ?? "Unknown");
+    await this.emit("close", new CloseError(reason))
   }
 
-  async read(timeout = false) {
+  async read(delay = 0) {
     const message = this.wait(["message"])
     const close = this.error(["close"])
 
-    if (timeout) {
+    if (delay > 0) {
       return await Timeout.race([message, close], 1000)
     } else {
       return await Abort.race([message, close])
@@ -135,7 +128,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
         const data = await Abort.race([message, close])
         yield data as Message<T>
       } catch (e) {
-        if (e instanceof Close) return;
+        if (e instanceof CloseError) break;
         throw e
       }
     }
@@ -144,7 +137,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
   /**
    * Open a channel
    * @param path Path
-   * @param data Data
+   * @param data Data to send
    */
   async open(path: string, data?: unknown) {
     const channel = new WSChannel(this)
@@ -153,12 +146,16 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
   }
 
   /**
-   * Open a channel and read it
+   * Open a channel; wait for a message; wait for close
    * @param path Path
-   * @param req Data
+   * @param request Data to send
+   * @param delay Timeout delay
+   * @returns Data received
    */
-  async request<T>(path: string, req?: unknown, delay = 1000) {
-    const channel = await this.open(path, req)
-    return await channel.read<T>(delay)
+  async request<T>(path: string, request?: unknown, delay = 1000) {
+    const channel = await this.open(path, request)
+    const result = await channel.read<T>(delay)
+    await channel.waitclose;
+    return result;
   }
 }
