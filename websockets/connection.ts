@@ -109,24 +109,21 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     await this.emit("close", new CloseError(reason))
   }
 
-  async read(delay = 0) {
-    const message = this.wait(["message"])
+  async read<T = unknown>(path: string, delay = 0) {
+    const message = this.channels.wait([path])
     const close = this.error(["close"])
 
     if (delay > 0) {
-      return await Timeout.race([message, close], 1000)
+      return await Timeout.race([message, close], 1000) as Message<T>
     } else {
-      return await Abort.race([message, close])
+      return await Abort.race([message, close]) as Message<T>
     }
   }
 
   async* listen<T = unknown>(path: string) {
     while (true) {
       try {
-        const message = this.channels.wait([path])
-        const close = this.error(["close"])
-        const data = await Abort.race([message, close])
-        yield data as Message<T>
+        yield this.read<T>(path)
       } catch (e) {
         if (e instanceof CloseError) break;
         throw e
