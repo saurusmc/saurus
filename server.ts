@@ -7,7 +7,7 @@ import { Connection } from "./connection.ts";
 
 import type { WSConnection } from "./websockets/connection.ts";
 
-import type { PlayerChatEvent, PlayerCodeEvent, PlayerMessageEvent, PlayerMoveEvent, PlayerRespawnEvent } from "./events.ts";
+import type { PlayerChatEvent, PlayerCodeEvent, PlayerFlyEvent, PlayerMessageEvent, PlayerMoveEvent, PlayerRespawnEvent, PlayerSneakEvent, PlayerSprintEvent, PlayerTeleportEvent, WeatherChangeEvent } from "./events.ts";
 
 export interface EventMessage {
   event: string
@@ -23,6 +23,11 @@ export interface ServerEvents {
   "player.move": PlayerMoveEvent
   "player.chat": PlayerChatEvent
   "player.code": PlayerCodeEvent
+  "player.sneak": PlayerSneakEvent
+  "player.fly": PlayerFlyEvent
+  "player.sprint": PlayerSprintEvent
+  "player.teleport": PlayerTeleportEvent
+  "weather.change": WeatherChangeEvent
 }
 
 export class Server extends Connection {

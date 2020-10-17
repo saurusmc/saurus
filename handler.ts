@@ -39,10 +39,6 @@ export interface CodeRequest {
   code: string
 }
 
-export interface HandlerOptions extends ListenOptions {
-  debug?: boolean,
-}
-
 export class Handler extends EventEmitter<{
   code: CodeRequest
   server: Server
@@ -51,7 +47,7 @@ export class Handler extends EventEmitter<{
   readonly tokens = new Map<string, Player>()
 
   constructor(
-    readonly options: HandlerOptions,
+    readonly options: ListenOptions,
   ) {
     super()
 
@@ -69,11 +65,6 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
-    if (this.options.debug) {
-      const off = conn.on(["message"], console.debug)
-      conn.once(["close"], off)
-    }
-
     for await (const hello of conn.listen<Hello>("/hello")) {
       const { channel, data } = hello;
 

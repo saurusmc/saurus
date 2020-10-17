@@ -23,16 +23,13 @@ export class Players extends EventEmitter<PlayersEvents> {
     const offquit = server.events.on(["player.quit"],
       this.onquit.bind(this))
 
-    const offlist = server.channels.on(["/players/list"],
-      ({ channel }) => channel.close(this.list()))
-
-    server.once(["close"], offjoin, offquit, offlist)
+    server.once(["close"], offjoin, offquit)
   }
 
-  list() {
+  async list(extras: string[]) {
     const infos = new Array<PlayerInfo>()
     for (const player of this.uuids.values())
-      infos.push(player.extras())
+      infos.push(await player.extra(extras))
     return infos
   }
 
@@ -55,7 +52,7 @@ export class Players extends EventEmitter<PlayersEvents> {
 
   async onquit(e: PlayerMessageEvent) {
     const { name, uuid } = e.player;
-    const player = this.uuids.get(uuid)!!
+    const player = this.uuids.get(uuid)!
     if (player.name !== name) return;
 
     this.names.delete(name)
