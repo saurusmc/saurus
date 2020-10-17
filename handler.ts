@@ -65,6 +65,8 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
+    conn.on(["message"], console.log)
+
     for await (const hello of conn.listen<Hello>("/hello")) {
       const { channel, data } = hello;
 

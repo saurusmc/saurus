@@ -70,10 +70,8 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
           return;
         }
 
-        if (typeof e === "string") {
-          const msg = JSON.parse(e) as WSMessage
-          this.emit("message", msg)
-        }
+        if (typeof e === "string")
+          this.handlemessage(e)
       }
 
       const error = new CloseError()
@@ -81,11 +79,19 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     } catch (e) {
       if (e instanceof Error)
         await this.close(e.message)
-      else throw e
     }
   }
 
-  protected async onmessage(msg: WSMessage) {
+  private async handlemessage(e: string) {
+    try {
+      const msg = JSON.parse(e) as WSMessage
+      await this.emit("message", msg)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private async onmessage(msg: WSMessage) {
     if (msg.type === "open") {
       const { uuid, path, data } = msg;
       const channel = new WSChannel(this, uuid)
