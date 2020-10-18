@@ -5,11 +5,11 @@ import {
   isWebSocketPongEvent,
   WebSocketPingEvent,
   WebSocketPongEvent
-} from "https://deno.land/std/ws/mod.ts";
+} from "std/ws/mod.ts";
 
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
-import { Timeout } from "https://deno.land/x/timeout/mod.ts"
-import { Abort } from "https://deno.land/x/abortable/mod.ts";
+import { EventEmitter } from "mutevents";
+import { Timeout } from "timeout"
+import { Abort } from "abortable";
 
 import { WSChannel } from "./channel.ts";
 

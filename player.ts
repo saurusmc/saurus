@@ -1,4 +1,4 @@
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
+import { EventEmitter } from "mutevents"
 
 import type { Server } from "./server.ts"
 import type { App } from "./app.ts"

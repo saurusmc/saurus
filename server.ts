@@ -1,6 +1,6 @@
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
-import { Timeout, TimeoutError } from "https://deno.land/x/timeout/mod.ts"
-import { Abort } from "https://deno.land/x/abortable/mod.ts"
+import { EventEmitter } from "mutevents"
+import { Timeout, TimeoutError } from "timeout"
+import { Abort } from "abortable"
 
 import { Players } from "./players.ts";
 import { Connection } from "./connection.ts";

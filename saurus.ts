@@ -1,9 +1,10 @@
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
+import { EventEmitter } from "mutevents"
 
 import { Console } from "./console.ts";
 import { Handler } from "./handler.ts";
+
 import type { Server } from "./server.ts";
-import { ListenOptions } from "./websockets/server.ts";
+import type { ListenOptions } from "./websockets/server.ts";
 
 export class Saurus extends EventEmitter<{
   server: Server

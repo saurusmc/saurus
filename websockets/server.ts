@@ -3,17 +3,14 @@ import {
   HTTPSOptions,
   serve,
   serveTLS,
-} from "https://deno.land/std/http/server.ts";
+} from "std/http/server.ts";
 
-import {
-  acceptWebSocket,
-  WebSocket
-} from "https://deno.land/std/ws/mod.ts";
+import { acceptWebSocket } from "std/ws/mod.ts";
 
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
+import { EventEmitter } from "mutevents";
 import { WSConnection } from "./connection.ts";
 
-export type { HTTPSOptions } from "https://deno.land/std/http/server.ts"
+export type { HTTPSOptions } from "std/http/server.ts"
 
 export interface ListenOptions {
   hostname?: string

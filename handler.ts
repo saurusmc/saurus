@@ -1,8 +1,8 @@
 
-import { Cancelled, EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
-import * as UUID from "https://deno.land/std/uuid/v4.ts"
-import { Timeout } from "https://deno.land/x/timeout/mod.ts"
-import { Random } from "https://deno.land/x/random@v1.1.2/Random.js";
+import { Cancelled, EventEmitter } from "mutevents"
+import * as UUID from "std/uuid/v4.ts"
+import { Timeout } from "timeout"
+import { Random } from "random";
 
 import { Server } from "./server.ts";
 

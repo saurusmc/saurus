@@ -1,7 +1,7 @@
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts";
-import { Abort } from "https://deno.land/x/abortable/mod.ts";
-import { Timeout } from "https://deno.land/x/timeout/mod.ts";
-import * as UUID from "https://deno.land/std/uuid/v4.ts"
+import { EventEmitter } from "mutevents";
+import { Abort } from "abortable";
+import { Timeout } from "timeout";
+import * as UUID from "std/uuid/v4.ts"
 
 import type { WSMessage } from "./message.ts";
 

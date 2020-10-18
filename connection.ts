@@ -1,5 +1,5 @@
-import { EventEmitter } from "https://deno.land/x/mutevents/mod.ts"
-import * as UUID from "https://deno.land/std/uuid/v4.ts"
+import { EventEmitter } from "mutevents"
+import * as UUID from "std/uuid/v4.ts"
 
 import type { CloseError, WSConnection, } from "./websockets/connection.ts"
 

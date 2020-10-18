@@ -1,6 +1,6 @@
-import { EventEmitter } from "https://deno.land/x/mutevents@5.2.2/mod.ts";
-import { Player } from "./player.ts";
-import { PlayerInfo } from "./types.ts";
+import { EventEmitter } from "mutevents";
+
+import type { Player } from "./player.ts";
 
 export type Promiseable<T> = T | Promise<T>
 
