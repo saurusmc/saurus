@@ -10,7 +10,6 @@ export interface ToggleableEvents {
 }
 
 export interface Toggleable extends EventEmitter<ToggleableEvents> {
-  enabled: Promiseable<boolean>
   enable(): Promiseable<void>
   disable(): Promiseable<void>
 }
