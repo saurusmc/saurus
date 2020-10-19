@@ -65,22 +65,23 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
+    conn.on(["close"], (e) => console.error("f", e))
     conn.on(["message"], console.log)
 
-    for await (const hello of conn.listen<Hello>("/hello")) {
-      const { channel, data } = hello;
-
+    for await (const channel of conn.listen("/hello")) {
       try {
+        const data = await channel.read<Hello>()
+
         if (data.type === "server")
           await this.handleserver(channel, data)
         if (data.type === "app")
           await this.handleapp(channel, data)
       } catch (e) {
         if (e instanceof CloseError)
-          return;
+          return
         if (e instanceof Error)
           await channel.throw(e.message)
-        else throw e
+        else console.error("onaccept", e)
       }
     }
   }
@@ -90,6 +91,7 @@ export class Handler extends EventEmitter<{
     const server = new Server(channel.conn, name, platform, password)
     await channel.close({ uuid: server.uuid })
     await this.emit("server", server)
+    console.log(5)
   }
 
   private async handleapp(channel: WSChannel, hello: AppHello) {

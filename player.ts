@@ -72,10 +72,10 @@ export class Player extends EventEmitter<{
     return { name, uuid }
   }
 
-  async extra(extras: string[]) {
+  extra(features: string[]) {
     const info = this.json
-    for (const extra of extras)
-      this.extras.emitSync(extra, info)
+    for (const feature of features)
+      this.extras.emitSync(feature, info)
     return info
   }
 
@@ -104,13 +104,11 @@ export class Player extends EventEmitter<{
   }
 
   private async onAutorize(app: App) {
-    const offList = app.channels.on(["/server/list"], async (e) => {
-      const extras = e.data as string[]
+    const offList = app.channels.on(["/server/list"], async (channel) => {
+      const extras = await channel.read<string[]>()
+      const list = this.server.players.list(extras)
 
-      const list = await
-        this.server.players.list(extras)
-
-      await e.channel.close(list)
+      await channel.close(list)
     })
 
     const offQuit = this.once(["quit"],

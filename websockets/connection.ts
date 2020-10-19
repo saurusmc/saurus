@@ -33,7 +33,7 @@ export interface WSConnectionEvents {
 
 export class WSConnection extends EventEmitter<WSConnectionEvents> {
   readonly channels = new EventEmitter<{
-    [path: string]: Message
+    [path: string]: WSChannel
   }>()
 
   constructor(
@@ -57,10 +57,10 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     try {
       for await (const e of this.socket) {
         if (isWebSocketPingEvent(e))
-          this.emit("ping", e)
+          await this.emit("ping", e)
 
         if (isWebSocketPongEvent(e))
-          this.emit("pong", e)
+          await this.emit("pong", e)
 
         if (isWebSocketCloseEvent(e)) {
           const error = new CloseError(e.reason)
@@ -85,51 +85,51 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
       const msg = JSON.parse(e) as WSMessage
       await this.emit("message", msg)
     } catch (e) {
-      console.error(e)
+      if (e instanceof CloseError)
+        console.error("handlemessage", e)
+      if (e instanceof Error)
+        await this.close(e.message)
     }
   }
 
   private async onmessage(msg: WSMessage) {
     if (msg.type === "open") {
-      const { uuid, path, data } = msg;
-      const channel = new WSChannel(this, uuid)
-      await this.channels.emit(path, { channel, data })
+      const channel = new WSChannel(this, msg.uuid)
+      await channel.emit("open", msg.path)
+      await this.channels.emit(msg.path, channel)
+      await Timeout.wait(100)
+      await channel.emit("message", msg.data)
     }
   }
 
   async send(msg: WSMessage) {
-    if (this.closed)
-      throw new Error("Closed")
-
     const text = JSON.stringify(msg);
     await this.socket.send(text);
   }
 
   async close(reason?: string) {
-    if (this.closed)
-      throw new Error("Closed")
-
     await this.socket.close(1000, reason ?? "Unknown");
     await this.emit("close", new CloseError(reason))
   }
 
-  async read<T = unknown>(path: string, delay = 0) {
+  async waitopen(path: string, delay = 0) {
     const message = this.channels.wait([path])
     const close = this.error(["close"])
 
     if (delay > 0) {
-      return await Timeout.race([message, close], 1000) as Message<T>
+      return await Timeout.race([message, close], 1000)
     } else {
-      return await Abort.race([message, close]) as Message<T>
+      return await Abort.race([message, close])
     }
   }
 
-  async* listen<T = unknown>(path: string) {
+  async* listen(path: string) {
     while (true) {
       try {
-        yield this.read<T>(path)
+        yield this.waitopen(path)
       } catch (e) {
-        if (e instanceof CloseError) break;
+        if (e instanceof CloseError)
+          return;
         throw e
       }
     }

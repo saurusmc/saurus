@@ -8,8 +8,9 @@ import type { WSMessage } from "./message.ts";
 import { CloseError, WSConnection } from "./connection.ts";
 
 export class WSChannel extends EventEmitter<{
-  message: unknown
+  open: string
   close: "OK" | CloseError
+  message: unknown
 }> {
   constructor(
     readonly conn: WSConnection,
@@ -24,17 +25,6 @@ export class WSChannel extends EventEmitter<{
     this.once(["close"], offmessage)
   }
 
-  async *[Symbol.asyncIterator]() {
-    while (true) {
-      try {
-        yield await this.read()
-      } catch (e: unknown) {
-        if (e === "OK") break;
-        else throw e
-      }
-    }
-  }
-
   /**
    * Promise that resolves if closed normally, or rejects if closed with an error.
    * @throws CloseError
@@ -42,17 +32,32 @@ export class WSChannel extends EventEmitter<{
    * await channel.waitclose
    * console.log("Channel closed normally")
    */
-  waitclose = this._waitclose().catch()
+  readonly waitclose = this._waitclose()
+    .catch(() => undefined)
+
+  readonly waitopen = this._waitopen()
+    .catch(() => undefined)
+
+  private async _waitopen() {
+    const open = this.wait(["open"])
+    const close = this.error(["close"])
+    await Abort.race([open, close])
+  }
 
   private async _waitclose() {
     const close = await this.wait(["close"])
-    if (close !== "OK") throw close
+    if (close instanceof Error) throw close
   }
 
   private async onmessage(msg: WSMessage) {
     if (msg.uuid !== this.uuid) return;
 
     if (msg.type === undefined) {
+      await this.emit("message", msg.data)
+    }
+
+    if (msg.type === "open") {
+      await this.emit("open", msg.path)
       await this.emit("message", msg.data)
     }
 
@@ -72,6 +77,7 @@ export class WSChannel extends EventEmitter<{
    */
   async open(path: string, data?: unknown) {
     const { conn, uuid } = this
+    await this.emit("open", path)
     await conn.send({ uuid, type: "open", path, data })
   }
 
@@ -81,6 +87,7 @@ export class WSChannel extends EventEmitter<{
    */
   async close(data?: unknown) {
     const { conn, uuid } = this;
+    await this.emit("close", "OK")
     await conn.send({ uuid, type: "close", data })
   }
 
@@ -90,6 +97,7 @@ export class WSChannel extends EventEmitter<{
    */
   async throw(reason?: string) {
     const { conn, uuid } = this;
+    await this.emit("close", new CloseError(reason))
     await conn.send({ uuid, type: "error", reason })
   }
 
@@ -107,7 +115,7 @@ export class WSChannel extends EventEmitter<{
    * Throws if it's closed or timed out
    * @param delay Timeout delay
    * @returns Some typed data
-   * @throw Close | CloseError | TimeoutError
+   * @throw "OK" | CloseError | TimeoutError
    */
   async read<T = unknown>(delay = 0) {
     const message = this.wait(["message"])

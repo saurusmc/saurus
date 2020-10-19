@@ -26,15 +26,16 @@ export class Players extends EventEmitter<PlayersEvents> {
     server.once(["close"], offjoin, offquit)
   }
 
-  async list(extras: string[]) {
+  list(features: string[]) {
     const infos = new Array<PlayerInfo>()
     for (const player of this.uuids.values())
-      infos.push(await player.extra(extras))
+      infos.push(player.extra(features))
     return infos
   }
 
   get(player: PlayerInfo) {
-    return this.uuids.get(player.uuid) || this.names.get(player.name)
+    return this.uuids.get(player.uuid)
+      || this.names.get(player.name)
   }
 
   async onjoin(e: PlayerMessageEvent) {
