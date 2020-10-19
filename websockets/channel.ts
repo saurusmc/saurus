@@ -7,11 +7,9 @@ import type { WSMessage } from "./message.ts";
 
 import { CloseError, WSConnection } from "./connection.ts";
 
-export class Close { }
-
 export class WSChannel extends EventEmitter<{
   message: unknown
-  close: Close | CloseError
+  close: "OK" | CloseError
 }> {
   constructor(
     readonly conn: WSConnection,
@@ -31,8 +29,7 @@ export class WSChannel extends EventEmitter<{
       try {
         yield await this.read()
       } catch (e: unknown) {
-        if (e instanceof Close)
-          break;
+        if (e === "OK") break;
         else throw e
       }
     }
@@ -40,16 +37,17 @@ export class WSChannel extends EventEmitter<{
 
   /**
    * Promise that resolves if closed normally, or rejects if closed with an error.
-   * @returns Close
    * @throws CloseError
    * @example 
    * await channel.waitclose
    * console.log("Channel closed normally")
    */
-  waitclose = new Promise<void>((ok, err) => {
-    this.wait(["close"]).then((close) =>
-      close instanceof Close ? ok() : err(close))
-  })
+  waitclose = this._waitclose().catch()
+
+  private async _waitclose() {
+    const close = await this.wait(["close"])
+    if (close !== "OK") throw close
+  }
 
   private async onmessage(msg: WSMessage) {
     if (msg.uuid !== this.uuid) return;
@@ -60,7 +58,7 @@ export class WSChannel extends EventEmitter<{
 
     if (msg.type === "close") {
       await this.emit("message", msg.data)
-      await this.emit("close", new Close())
+      await this.emit("close", "OK")
     }
 
     if (msg.type === "error") {

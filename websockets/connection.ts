@@ -16,9 +16,7 @@ import { WSChannel } from "./channel.ts";
 import type { WSMessage } from "./message.ts";
 
 export class CloseError extends Error {
-  constructor(readonly reason = "Unknown") {
-    super(`Closed (${reason})`)
-  }
+  constructor(readonly reason?: string) { super(`Closed`) }
 }
 
 export interface Message<T = unknown> {

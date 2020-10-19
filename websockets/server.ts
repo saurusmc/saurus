@@ -76,8 +76,9 @@ export class WSServer extends EventEmitter<{
       await this.emit("accept", conn)
     } catch (e) {
       if (e instanceof Error)
-        conn.close(e.message)
-      else conn.close()
+        await conn.close(e.message)
+      else
+        await conn.close()
     }
   }
 }

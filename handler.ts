@@ -10,7 +10,7 @@ import type { Player } from "./player.ts";
 import { App } from "./app.ts";
 
 import { ListenOptions, WSServer } from "./websockets/server.ts";
-import type { WSConnection } from "./websockets/connection.ts";
+import { CloseError, WSConnection } from "./websockets/connection.ts";
 import type { WSChannel } from "./websockets/channel.ts";
 import type { PlayerInfo } from "./types.ts";
 
@@ -76,8 +76,11 @@ export class Handler extends EventEmitter<{
         if (data.type === "app")
           await this.handleapp(channel, data)
       } catch (e) {
+        if (e instanceof CloseError)
+          return;
         if (e instanceof Error)
           await channel.throw(e.message)
+        else throw e
       }
     }
   }
