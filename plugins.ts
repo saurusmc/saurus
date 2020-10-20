@@ -15,6 +15,8 @@ export interface Toggleable extends EventEmitter<ToggleableEvents> {
 }
 
 export interface Pinger {
-  isPingable(player: Player): Promiseable<boolean>
+  get(player: Player): Promiseable<boolean>
+  set(player: Player, value: boolean): Promiseable<void>
+  clear(player: Player): Promiseable<void>
   ping(player: Player, target: Player): Promiseable<void>
 }
