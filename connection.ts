@@ -1,10 +1,10 @@
 import { EventEmitter } from "mutevents"
 import * as UUID from "std/uuid/v4.ts"
 
-import type { CloseError, WSConnection, } from "./websockets/connection.ts"
+import type { ConnectionCloseError, WSConnection, } from "./websockets/connection.ts"
 
 export interface ConnectionEvents {
-  close: CloseError
+  close: ConnectionCloseError
 }
 
 export class Connection extends EventEmitter<ConnectionEvents> {

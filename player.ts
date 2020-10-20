@@ -104,11 +104,10 @@ export class Player extends EventEmitter<{
   }
 
   private async onAutorize(app: App) {
-    const offList = app.channels.on(["/server/list"], async (channel) => {
-      const extras = await channel.read<string[]>()
-      const list = this.server.players.list(extras)
-
-      await channel.close(list)
+    const offList = app.channels.on(["/server/list"], async (msg) => {
+      const features = msg.data as string[]
+      const list = this.server.players.list(features)
+      await msg.channel.close(list)
     })
 
     const offQuit = this.once(["quit"],

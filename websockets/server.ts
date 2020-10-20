@@ -8,7 +8,8 @@ import {
 import { acceptWebSocket } from "std/ws/mod.ts";
 
 import { EventEmitter } from "mutevents";
-import { WSConnection } from "./connection.ts";
+import { ConnectionCloseError, WSConnection } from "./connection.ts";
+import { ChannelCloseError } from "./channel.ts";
 
 export type { HTTPSOptions } from "std/http/server.ts"
 
@@ -75,10 +76,12 @@ export class WSServer extends EventEmitter<{
     try {
       await this.emit("accept", conn)
     } catch (e) {
-      if (e instanceof Error)
+      if (e instanceof ConnectionCloseError)
+        return
+      else if (e instanceof ChannelCloseError)
+        await conn.close(e.reason)
+      else if (e instanceof Error)
         await conn.close(e.message)
-      else
-        await conn.close()
     }
   }
 }

@@ -3,13 +3,15 @@ import { Abort } from "abortable";
 import { Timeout } from "timeout";
 import * as UUID from "std/uuid/v4.ts"
 
-import type { WSMessage } from "./message.ts";
+import { CloseError, WSMessage } from "./message.ts";
 
-import { CloseError, WSConnection } from "./connection.ts";
+import { WSConnection } from "./connection.ts";
+
+export class ChannelCloseError extends CloseError { }
 
 export class WSChannel extends EventEmitter<{
   open: string
-  close: "OK" | CloseError
+  close: CloseError
   message: unknown
 }> {
   constructor(
@@ -46,7 +48,7 @@ export class WSChannel extends EventEmitter<{
 
   private async _waitclose() {
     const close = await this.wait(["close"])
-    if (close instanceof Error) throw close
+    if (close.reason !== "OK") throw close
   }
 
   private async onmessage(msg: WSMessage) {
@@ -63,11 +65,13 @@ export class WSChannel extends EventEmitter<{
 
     if (msg.type === "close") {
       await this.emit("message", msg.data)
-      await this.emit("close", "OK")
+      await this.emit("close",
+        new ChannelCloseError("OK"))
     }
 
     if (msg.type === "error") {
-      await this.emit("close", new CloseError(msg.reason))
+      await this.emit("close",
+        new ChannelCloseError(msg.reason))
     }
   }
 
@@ -87,7 +91,8 @@ export class WSChannel extends EventEmitter<{
    */
   async close(data?: unknown) {
     const { conn, uuid } = this;
-    await this.emit("close", "OK")
+    await this.emit("close",
+      new ChannelCloseError("OK"))
     await conn.send({ uuid, type: "close", data })
   }
 
@@ -97,7 +102,8 @@ export class WSChannel extends EventEmitter<{
    */
   async throw(reason?: string) {
     const { conn, uuid } = this;
-    await this.emit("close", new CloseError(reason))
+    await this.emit("close",
+      new ChannelCloseError(reason))
     await conn.send({ uuid, type: "error", reason })
   }
 

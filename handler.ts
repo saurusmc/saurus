@@ -10,8 +10,8 @@ import type { Player } from "./player.ts";
 import { App } from "./app.ts";
 
 import { ListenOptions, WSServer } from "./websockets/server.ts";
-import { CloseError, WSConnection } from "./websockets/connection.ts";
-import type { WSChannel } from "./websockets/channel.ts";
+import { WSConnection } from "./websockets/connection.ts";
+import { WSChannel } from "./websockets/channel.ts";
 import type { PlayerInfo } from "./types.ts";
 
 export type Hello = ServerHello | AppHello
@@ -43,6 +43,7 @@ export class Handler extends EventEmitter<{
   code: CodeRequest
   server: Server
 }> {
+  readonly wsserver = new WSServer(this.options)
   readonly codes = new Map<string, App>()
   readonly tokens = new Map<string, Player>()
 
@@ -51,10 +52,11 @@ export class Handler extends EventEmitter<{
   ) {
     super()
 
-    const wss = new WSServer(options)
-    wss.on(["accept"], this.onaccept.bind(this))
+    this.wsserver.on(["accept"],
+      this.onaccept.bind(this))
 
-    this.on(["server"], this.onserver.bind(this))
+    this.on(["server"],
+      this.onserver.bind(this))
   }
 
   private genCode() {
@@ -65,24 +67,13 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
-    conn.on(["close"], (e) => console.error("f", e))
-    conn.on(["message"], console.log)
+    for await (const msg of conn.listen("/hello")) {
+      const data = msg.data as Hello
 
-    for await (const channel of conn.listen("/hello")) {
-      try {
-        const data = await channel.read<Hello>()
-
-        if (data.type === "server")
-          await this.handleserver(channel, data)
-        if (data.type === "app")
-          await this.handleapp(channel, data)
-      } catch (e) {
-        if (e instanceof CloseError)
-          return
-        if (e instanceof Error)
-          await channel.throw(e.message)
-        else console.error("onaccept", e)
-      }
+      if (data.type === "server")
+        await this.handleserver(msg.channel, data)
+      if (data.type === "app")
+        await this.handleapp(msg.channel, data)
     }
   }
 
@@ -91,7 +82,6 @@ export class Handler extends EventEmitter<{
     const server = new Server(channel.conn, name, platform, password)
     await channel.close({ uuid: server.uuid })
     await this.emit("server", server)
-    console.log(5)
   }
 
   private async handleapp(channel: WSChannel, hello: AppHello) {
