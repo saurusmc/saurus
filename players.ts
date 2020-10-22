@@ -3,7 +3,7 @@ import { EventEmitter } from "mutevents"
 import type { Server } from "./server.ts"
 import { Player } from "./player.ts"
 import { PlayerInfo } from "./types.ts"
-import { MinecraftEvent, PlayerJoinEvent, PlayerQuitEvent } from "./events.ts"
+import { isMinecraftEvent, MinecraftEvent, OtherEvent, PlayerJoinEvent, PlayerQuitEvent } from "./events.ts"
 
 export interface PlayersEvents {
   join: Player
@@ -35,7 +35,9 @@ export class Players extends EventEmitter<PlayersEvents> {
       || this.names.get(player.name)
   }
 
-  private async onevent(e: MinecraftEvent) {
+  private async onevent(e: MinecraftEvent | OtherEvent) {
+    if (!isMinecraftEvent(e)) return;
+
     if (e.event === "player.join")
       await this.onjoin(e)
     if (e.event === "player.quit")

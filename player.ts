@@ -3,7 +3,7 @@ import { EventEmitter } from "mutevents"
 import type { Server } from "./server.ts"
 import type { App } from "./app.ts"
 
-import type { PlayerChatEvent, PlayerMessageEvent, PlayerSneakEvent, PlayerFlyEvent } from "./events.ts"
+import { PlayerChatEvent, PlayerSneakEvent, PlayerFlyEvent, MinecraftEvent, OtherEvent, isMinecraftEvent, isPlayerEvent, PlayerTeleportEvent, PlayerRespawnEvent, PlayerDeathEvent, PlayerQuitEvent } from "./events.ts"
 import type { Extra, Location, PlayerInfo, UUID } from "./types.ts"
 
 export type TeleportCause =
@@ -17,18 +17,23 @@ export type TeleportCause =
   | "chorus-fruit"
   | "spectate"
 
+
 export interface Address {
   hostname: string,
   port: number
 }
 
+
+
 export class Player extends EventEmitter<{
   authorize: App
-  death: void
-  quit: void
-  chat: string
-  sneak: boolean
-  fly: boolean
+  death: PlayerDeathEvent["message"]
+  quit: PlayerQuitEvent["message"] | undefined
+  respawn: PlayerRespawnEvent["bed"]
+  chat: PlayerChatEvent["message"]
+  sneak: PlayerSneakEvent["sneaking"]
+  fly: PlayerFlyEvent["flying"]
+  teleport: Pick<PlayerTeleportEvent, "from" | "to" | "cause">
 }>  {
   extras = new EventEmitter<{
     [x: string]: Extra<PlayerInfo>
@@ -43,27 +48,17 @@ export class Player extends EventEmitter<{
   ) {
     super()
 
-    const offClose = server.once(["close"],
-      this.onServerClose.bind(this))
+    const offclose = server.once(["close"],
+      this.onserverclose.bind(this))
 
-    const offDeath = server.events.on(["player.death"],
-      this.onDeathEvent.bind(this))
+    const offevent = server.on(["event"],
+      this.onevent.bind(this))
 
-    const offChat = server.events.on(["player.chat"],
-      this.onChatEvent.bind(this))
-
-    const offSneak = server.events.on(["player.sneak"],
-      this.onSneakEvent.bind(this))
-
-    const offFly = server.events.on(["player.fly"],
-      this.onFlyEvent.bind(this))
-
-    const offAuthorize = this.on(["authorize"],
-      this.onAutorize.bind(this))
+    const offauthorize = this.on(["authorize"],
+      this.onautorize.bind(this))
 
     this.once(["quit"],
-      offClose, offDeath, offChat, offSneak,
-      offFly, offAuthorize
+      offclose, offevent, offauthorize
     )
   }
 
@@ -79,31 +74,33 @@ export class Player extends EventEmitter<{
     return info
   }
 
-  private async onServerClose() {
+  private async onserverclose() {
     await this.emit("quit", undefined)
   }
 
-  private async onDeathEvent(e: PlayerMessageEvent) {
+  private async onevent(e: MinecraftEvent | OtherEvent) {
+    if (!isMinecraftEvent(e)) return;
+    if (!isPlayerEvent(e)) return
     if (e.player.uuid !== this.uuid) return
-    await this.emit("death", undefined)
+
+    if (e.event === "player.death")
+      await this.emit("death", e.message)
+    if (e.event === "player.chat")
+      await this.emit("chat", e.message)
+    if (e.event === "player.sneak")
+      await this.emit("sneak", e.sneaking)
+    if (e.event === "player.fly")
+      await this.emit("fly", e.flying)
+    if (e.event === "player.respawn")
+      await this.emit("respawn", e.bed)
+    if (e.event === "player.teleport") {
+      const { from, to, cause } = e
+      await this.emit("teleport", { from, to, cause })
+    }
+
   }
 
-  private async onChatEvent(e: PlayerChatEvent) {
-    if (e.player.uuid !== this.uuid) return
-    await this.emit("chat", e.message)
-  }
-
-  private async onSneakEvent(e: PlayerSneakEvent) {
-    if (e.player.uuid !== this.uuid) return
-    await this.emit("sneak", e.sneaking)
-  }
-
-  private async onFlyEvent(e: PlayerFlyEvent) {
-    if (e.player.uuid !== this.uuid) return
-    await this.emit("fly", e.flying)
-  }
-
-  private async onAutorize(app: App) {
+  private async onautorize(app: App) {
     const offList = app.channels.on(["/server/list"], async (msg) => {
       const features = msg.data as string[]
       const list = this.server.players.list(features)

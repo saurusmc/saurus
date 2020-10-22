@@ -1,6 +1,21 @@
 import { TeleportCause } from "./player.ts";
 import { Location, PlayerInfo } from "./types.ts";
 
+export const minecraftEvents = [
+  "player.join",
+  "player.quit",
+  "player.death",
+  "player.respawn",
+  // "player.move",
+  "player.chat",
+  "player.code",
+  "player.sneak",
+  "player.fly",
+  "player.sprint",
+  "player.teleport",
+  "weather.change"
+]
+
 export type MinecraftEvent =
   | PlayerJoinEvent
   | PlayerQuitEvent
@@ -15,8 +30,24 @@ export type MinecraftEvent =
   | PlayerTeleportEvent
   | WeatherChangeEvent
 
+export interface OtherEvent {
+  event: string
+}
+
+export function isMinecraftEvent(e: OtherEvent): e is MinecraftEvent {
+  return minecraftEvents.includes(e.event)
+}
+
+export function isPlayerEvent(e: OtherEvent): e is PlayerEvent {
+  const player = (e as PlayerEvent).player
+  if (typeof player !== "object") return false
+  if (typeof player.name !== "string") return false
+  if (typeof player.uuid !== "string") return false;
+  return true;
+}
 
 export interface PlayerEvent {
+  event: string,
   player: PlayerInfo
 }
 
