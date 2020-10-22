@@ -85,19 +85,23 @@ export class Player extends EventEmitter<{
 
     if (e.event === "player.death")
       await this.emit("death", e.message)
+
     if (e.event === "player.chat")
       await this.emit("chat", e.message)
+
     if (e.event === "player.sneak")
       await this.emit("sneak", e.sneaking)
+
     if (e.event === "player.fly")
       await this.emit("fly", e.flying)
+
     if (e.event === "player.respawn")
       await this.emit("respawn", e.bed)
+
     if (e.event === "player.teleport") {
       const { from, to, cause } = e
       await this.emit("teleport", { from, to, cause })
     }
-
   }
 
   private async onautorize(app: App) {

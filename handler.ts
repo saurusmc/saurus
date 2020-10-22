@@ -13,6 +13,7 @@ import { ListenOptions, WSServer } from "./websockets/server.ts";
 import { WSConnection } from "./websockets/connection.ts";
 import { WSChannel } from "./websockets/channel.ts";
 import type { PlayerInfo } from "./types.ts";
+import { isMinecraftEvent } from "./events.ts";
 
 export type Hello = ServerHello | AppHello
 
@@ -126,7 +127,9 @@ export class Handler extends EventEmitter<{
   }
 
   private async onserver(server: Server) {
-    const off = server.events.on(["player.code"], async (e) => {
+    const off = server.on(["event"], async (e) => {
+      if (!isMinecraftEvent(e)) return
+      if (e.event !== "player.code") return
       const { player: { uuid }, code } = e
       const player = server.players.uuids.get(uuid)
       if (!player) throw new Cancelled("Invalid player")
