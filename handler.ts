@@ -68,13 +68,16 @@ export class Handler extends EventEmitter<{
   }
 
   private async onaccept(conn: WSConnection) {
-    for await (const msg of conn.listen("/hello")) {
-      const data = msg.data as Hello
+    try {
+      const { channel, data } = await
+        conn.waitopen<Hello>("/hello", 1000)
 
       if (data.type === "server")
-        await this.handleserver(msg.channel, data)
+        await this.handleserver(channel, data)
       if (data.type === "app")
-        await this.handleapp(msg.channel, data)
+        await this.handleapp(channel, data)
+    } catch (e: unknown) {
+      conn.catch(e)
     }
   }
 

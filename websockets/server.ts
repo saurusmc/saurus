@@ -2,6 +2,7 @@ import {
   HTTPOptions,
   HTTPSOptions,
   serve,
+  ServerRequest,
   serveTLS,
 } from "std/http/server.ts";
 
@@ -21,7 +22,7 @@ export interface ListenOptions {
 }
 
 function isHTTPS(options: ListenOptions): options is HTTPSOptions {
-  return Boolean(options.certFile && options.keyFile)
+  return Boolean(options.certFile) && Boolean(options.keyFile)
 }
 
 export class WSServer extends EventEmitter<{
@@ -39,49 +40,28 @@ export class WSServer extends EventEmitter<{
   }
 
   private async listen(options: HTTPOptions) {
-    for await (const req of serve(options)) {
-      try {
-        const socket = await acceptWebSocket({
-          conn: req.conn,
-          bufReader: req.r,
-          bufWriter: req.w,
-          headers: req.headers,
-        })
-
-        this.onaccept(new WSConnection(socket));
-      } catch (e) {
-        await req.respond({ status: 400 });
-      }
-    }
+    for await (const req of serve(options))
+      this.handle(req)
   }
 
   private async listenTLS(options: HTTPSOptions) {
-    for await (const req of serveTLS(options)) {
-      try {
-        const socket = await acceptWebSocket({
-          conn: req.conn,
-          bufReader: req.r,
-          bufWriter: req.w,
-          headers: req.headers,
-        })
-
-        this.onaccept(new WSConnection(socket));
-      } catch (e) {
-        await req.respond({ status: 400 });
-      }
-    }
+    for await (const req of serveTLS(options))
+      this.handle(req)
   }
 
-  private async onaccept(conn: WSConnection) {
+  private async handle(req: ServerRequest) {
     try {
-      await this.emit("accept", conn)
+      const socket = await acceptWebSocket({
+        conn: req.conn,
+        bufReader: req.r,
+        bufWriter: req.w,
+        headers: req.headers,
+      })
+
+      const conn = new WSConnection(socket)
+      this.emitSync("accept", conn)
     } catch (e) {
-      if (e instanceof ConnectionCloseError)
-        return
-      else if (e instanceof ChannelCloseError)
-        await conn.close(e.reason)
-      else if (e instanceof Error)
-        await conn.close(e.message)
+      await req.respond({ status: 400 });
     }
   }
 }

@@ -18,3 +18,14 @@ export interface Location {
   z: number
   world?: WorldInfo
 }
+
+export type TeleportCause =
+  | "command"
+  | "plugin"
+  | "unknown"
+  | "nether-portal"
+  | "end-portal"
+  | "end-gateway"
+  | "ender-pearl"
+  | "chorus-fruit"
+  | "spectate"

@@ -1,5 +1,6 @@
-import { TeleportCause } from "./player.ts";
-import { Location, PlayerInfo } from "./types.ts";
+import { Location, PlayerInfo, TeleportCause } from "./types.ts";
+
+export interface Event { event: string }
 
 export const minecraftEvents = [
   "player.join",
@@ -30,15 +31,13 @@ export type MinecraftEvent =
   | PlayerTeleportEvent
   | WeatherChangeEvent
 
-export interface OtherEvent {
-  event: string
-}
-
-export function isMinecraftEvent(e: OtherEvent): e is MinecraftEvent {
+export function isMinecraftEvent(e: Event): e is MinecraftEvent {
   return minecraftEvents.includes(e.event)
 }
 
-export function isPlayerEvent(e: OtherEvent): e is PlayerEvent {
+export interface PlayerEvent extends Event { player: PlayerInfo }
+
+export function isPlayerEvent(e: Event): e is PlayerEvent {
   const player = (e as PlayerEvent).player
   if (typeof player !== "object") return false
   if (typeof player.name !== "string") return false
@@ -46,28 +45,27 @@ export function isPlayerEvent(e: OtherEvent): e is PlayerEvent {
   return true;
 }
 
-export interface PlayerEvent {
-  event: string,
-  player: PlayerInfo
-}
-
 export interface PlayerJoinEvent extends PlayerEvent {
   event: "player.join"
+  location: Location
   message: string
 }
 
 export interface PlayerQuitEvent extends PlayerEvent {
   event: "player.quit"
+  location: Location
   message: string
 }
 
 export interface PlayerDeathEvent extends PlayerEvent {
   event: "player.death"
+  location: Location
   message: string
 }
 
 export interface PlayerRespawnEvent extends PlayerEvent {
   event: "player.respawn"
+  location: Location
   anchor: boolean
   bed: boolean
 }

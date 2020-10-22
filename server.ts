@@ -6,10 +6,10 @@ import { Players } from "./players.ts";
 import { Connection, ConnectionEvents } from "./connection.ts";
 
 import type { WSConnection } from "./websockets/connection.ts";
-import { minecraftEvents, MinecraftEvent, OtherEvent } from "./events.ts";
+import { minecraftEvents, MinecraftEvent, Event } from "./events.ts";
 
 export interface ServerEvents extends ConnectionEvents {
-  event: MinecraftEvent | OtherEvent
+  event: Event
 }
 
 export class Server extends Connection<ServerEvents> {
@@ -48,7 +48,7 @@ export class Server extends Connection<ServerEvents> {
     const events = await this.open("/events")
 
     const off = events.on(["message"], async (data) => {
-      const e = data as OtherEvent
+      const e = data as Event
       await this.emit("event", e)
     })
 

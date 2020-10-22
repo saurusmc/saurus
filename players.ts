@@ -3,11 +3,14 @@ import { EventEmitter } from "mutevents"
 import type { Server } from "./server.ts"
 import { Player } from "./player.ts"
 import { PlayerInfo } from "./types.ts"
-import { isMinecraftEvent, MinecraftEvent, OtherEvent, PlayerJoinEvent, PlayerQuitEvent } from "./events.ts"
+import { isMinecraftEvent, MinecraftEvent, Event, PlayerJoinEvent, PlayerQuitEvent } from "./events.ts"
+
+export type JoinEvent = PlayerJoinEvent & { player: Player }
+export type QuitEvent = PlayerQuitEvent & { player: Player }
 
 export interface PlayersEvents {
-  join: Player
-  quit: Player
+  join: JoinEvent
+  quit?: QuitEvent
 }
 
 export class Players extends EventEmitter<PlayersEvents> {
@@ -35,7 +38,7 @@ export class Players extends EventEmitter<PlayersEvents> {
       || this.names.get(player.name)
   }
 
-  private async onevent(e: MinecraftEvent | OtherEvent) {
+  private async onevent(e: MinecraftEvent | Event) {
     if (!isMinecraftEvent(e)) return;
 
     if (e.event === "player.join")
@@ -47,7 +50,9 @@ export class Players extends EventEmitter<PlayersEvents> {
   async onjoin(e: PlayerJoinEvent) {
     const { name, uuid } = e.player;
     const player = new Player(this.server, name, uuid)
-    const cancelled = await this.emit("join", player)
+
+    const cancelled =
+      await this.emit("join", { ...e, player })
 
     if (cancelled) {
       await player.kick(cancelled.reason)
@@ -65,7 +70,7 @@ export class Players extends EventEmitter<PlayersEvents> {
     this.names.delete(name)
     this.uuids.delete(uuid)
 
-    await this.emit("quit", player)
-    await player.emit("quit", undefined)
+    await this.emit("quit", { ...e, player })
+    await player.emit("quit", e)
   }
 }

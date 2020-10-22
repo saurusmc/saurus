@@ -1,40 +1,39 @@
 import { EventEmitter } from "mutevents"
+import {
+  isMinecraftEvent,
+  isPlayerEvent,
+  MinecraftEvent,
+  Event,
+  PlayerChatEvent,
+  PlayerDeathEvent,
+  PlayerFlyEvent,
+  PlayerQuitEvent,
+  PlayerRespawnEvent,
+  PlayerSneakEvent,
+  PlayerTeleportEvent
+} from "./events.ts"
 
-import type { Server } from "./server.ts"
 import type { App } from "./app.ts"
-
-import { PlayerChatEvent, PlayerSneakEvent, PlayerFlyEvent, MinecraftEvent, OtherEvent, isMinecraftEvent, isPlayerEvent, PlayerTeleportEvent, PlayerRespawnEvent, PlayerDeathEvent, PlayerQuitEvent } from "./events.ts"
-import type { Extra, Location, PlayerInfo, UUID } from "./types.ts"
-
-export type TeleportCause =
-  | "command"
-  | "plugin"
-  | "unknown"
-  | "nether-portal"
-  | "end-portal"
-  | "end-gateway"
-  | "ender-pearl"
-  | "chorus-fruit"
-  | "spectate"
-
+import type { Server } from "./server.ts"
+import type { Extra, Location, PlayerInfo, UUID, TeleportCause } from "./types.ts"
 
 export interface Address {
   hostname: string,
   port: number
 }
 
-
-
-export class Player extends EventEmitter<{
+export interface PlayerEvents {
   authorize: App
-  death: PlayerDeathEvent["message"]
-  quit: PlayerQuitEvent["message"] | undefined
-  respawn: PlayerRespawnEvent["bed"]
-  chat: PlayerChatEvent["message"]
-  sneak: PlayerSneakEvent["sneaking"]
-  fly: PlayerFlyEvent["flying"]
-  teleport: Pick<PlayerTeleportEvent, "from" | "to" | "cause">
-}>  {
+  quit?: PlayerQuitEvent
+  death: PlayerDeathEvent
+  chat: PlayerChatEvent
+  sneak: PlayerSneakEvent
+  fly: PlayerFlyEvent
+  respawn: PlayerRespawnEvent
+  teleport: PlayerTeleportEvent
+}
+
+export class Player extends EventEmitter<PlayerEvents>  {
   extras = new EventEmitter<{
     [x: string]: Extra<PlayerInfo>
   }>()
@@ -78,34 +77,32 @@ export class Player extends EventEmitter<{
     await this.emit("quit", undefined)
   }
 
-  private async onevent(e: MinecraftEvent | OtherEvent) {
+  private async onevent(e: MinecraftEvent | Event) {
     if (!isMinecraftEvent(e)) return;
     if (!isPlayerEvent(e)) return
     if (e.player.uuid !== this.uuid) return
 
     if (e.event === "player.death")
-      await this.emit("death", e.message)
+      await this.emit("death", e)
 
     if (e.event === "player.chat")
-      await this.emit("chat", e.message)
+      await this.emit("chat", e)
 
     if (e.event === "player.sneak")
-      await this.emit("sneak", e.sneaking)
+      await this.emit("sneak", e)
 
     if (e.event === "player.fly")
-      await this.emit("fly", e.flying)
+      await this.emit("fly", e)
 
     if (e.event === "player.respawn")
-      await this.emit("respawn", e.bed)
+      await this.emit("respawn", e)
 
-    if (e.event === "player.teleport") {
-      const { from, to, cause } = e
-      await this.emit("teleport", { from, to, cause })
-    }
+    if (e.event === "player.teleport")
+      await this.emit("teleport", e)
   }
 
   private async onautorize(app: App) {
-    const offList = app.channels.on(["/server/list"], async (msg) => {
+    const offList = app.paths.on(["/server/list"], async (msg) => {
       const features = msg.data as string[]
       const list = this.server.players.list(features)
       await msg.channel.close(list)

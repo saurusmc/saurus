@@ -18,8 +18,8 @@ export class Connection<T extends ConnectionEvents = ConnectionEvents> extends E
     conn.once(["close"], this.reemit("close"))
   }
 
-  get channels() {
-    return this.conn.channels
+  get paths() {
+    return this.conn.paths
   }
 
   async close(reason?: string) {
