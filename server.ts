@@ -3,35 +3,21 @@ import { Timeout, TimeoutError } from "timeout"
 import { Abort } from "abortable"
 
 import { Players } from "./players.ts";
-import { Connection } from "./connection.ts";
+import { Connection, ConnectionEvents } from "./connection.ts";
 
 import type { WSConnection } from "./websockets/connection.ts";
-
-import type { PlayerChatEvent, PlayerCodeEvent, PlayerFlyEvent, PlayerMessageEvent, PlayerMoveEvent, PlayerRespawnEvent, PlayerSneakEvent, PlayerSprintEvent, PlayerTeleportEvent, WeatherChangeEvent } from "./events.ts";
+import { MinecraftEvent } from "./events.ts";
 
 export interface EventMessage {
   event: string
   [x: string]: unknown
 }
 
-export interface ServerEvents {
-  [x: string]: unknown
-  "player.join": PlayerMessageEvent
-  "player.quit": PlayerMessageEvent
-  "player.death": PlayerMessageEvent
-  "player.respawn": PlayerRespawnEvent
-  "player.move": PlayerMoveEvent
-  "player.chat": PlayerChatEvent
-  "player.code": PlayerCodeEvent
-  "player.sneak": PlayerSneakEvent
-  "player.fly": PlayerFlyEvent
-  "player.sprint": PlayerSprintEvent
-  "player.teleport": PlayerTeleportEvent
-  "weather.change": WeatherChangeEvent
+export interface ServerEvents extends ConnectionEvents {
+  event: MinecraftEvent
 }
 
-export class Server extends Connection {
-  events = new EventEmitter<ServerEvents>()
+export class Server extends Connection<ServerEvents> {
 
   players = new Players(this)
 
@@ -67,8 +53,8 @@ export class Server extends Connection {
     const events = await this.open("/events")
 
     const off = events.on(["message"], async (data) => {
-      const { event, ...e } = data as EventMessage
-      await this.events.emit(event, e)
+      const e = data as MinecraftEvent
+      await this.emit("event", e)
     })
 
     events.once(["close"], off)

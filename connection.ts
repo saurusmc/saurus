@@ -7,7 +7,7 @@ export interface ConnectionEvents {
   close: ConnectionCloseError
 }
 
-export class Connection extends EventEmitter<ConnectionEvents> {
+export class Connection<T extends ConnectionEvents = ConnectionEvents> extends EventEmitter<T> {
   readonly uuid = UUID.generate()
 
   constructor(

@@ -3,7 +3,7 @@ import { EventEmitter } from "mutevents"
 import type { Server } from "./server.ts"
 import { Player } from "./player.ts"
 import { PlayerInfo } from "./types.ts"
-import { PlayerMessageEvent } from "./events.ts"
+import { MinecraftEvent, PlayerJoinEvent, PlayerQuitEvent } from "./events.ts"
 
 export interface PlayersEvents {
   join: Player
@@ -17,13 +17,10 @@ export class Players extends EventEmitter<PlayersEvents> {
   constructor(readonly server: Server) {
     super()
 
-    const offjoin = server.events.on(["player.join"],
-      this.onjoin.bind(this))
+    const offevent = server.on(["event"],
+      this.onevent.bind(this))
 
-    const offquit = server.events.on(["player.quit"],
-      this.onquit.bind(this))
-
-    server.once(["close"], offjoin, offquit)
+    server.once(["close"], offevent)
   }
 
   list(features: string[]) {
@@ -38,7 +35,14 @@ export class Players extends EventEmitter<PlayersEvents> {
       || this.names.get(player.name)
   }
 
-  async onjoin(e: PlayerMessageEvent) {
+  private async onevent(e: MinecraftEvent) {
+    if (e.event === "player.join")
+      await this.onjoin(e)
+    if (e.event === "player.quit")
+      await this.onquit(e)
+  }
+
+  async onjoin(e: PlayerJoinEvent) {
     const { name, uuid } = e.player;
     const player = new Player(this.server, name, uuid)
     const cancelled = await this.emit("join", player)
@@ -51,7 +55,7 @@ export class Players extends EventEmitter<PlayersEvents> {
     }
   }
 
-  async onquit(e: PlayerMessageEvent) {
+  async onquit(e: PlayerQuitEvent) {
     const { name, uuid } = e.player;
     const player = this.uuids.get(uuid)!
     if (player.name !== name) return;
