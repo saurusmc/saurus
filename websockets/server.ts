@@ -8,7 +8,7 @@ import {
 
 import { acceptWebSocket } from "std/ws/mod.ts";
 
-import { EventEmitter } from "mutevents";
+import { EventEmitter } from "mutevents/mod.ts";
 import { ConnectionCloseError, WSConnection } from "./connection.ts";
 import { ChannelCloseError } from "./channel.ts";
 

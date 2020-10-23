@@ -1,12 +1,11 @@
-import { EventEmitter } from "mutevents"
-import { Timeout, TimeoutError } from "timeout"
-import { Abort } from "abortable"
+import { Timeout, TimeoutError } from "timeout/mod.ts"
+import { Abort } from "abortable/mod.ts"
 
 import { Players } from "./players.ts";
 import { Connection, ConnectionEvents } from "./connection.ts";
 
 import type { WSConnection } from "./websockets/connection.ts";
-import { minecraftEvents, MinecraftEvent, Event } from "./events.ts";
+import { Event } from "./events.ts";
 
 export interface ServerEvents extends ConnectionEvents {
   event: Event

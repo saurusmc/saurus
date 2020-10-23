@@ -1,8 +1,8 @@
 
-import { Cancelled, EventEmitter } from "mutevents"
+import { Cancelled, EventEmitter } from "mutevents/mod.ts"
 import * as UUID from "std/uuid/v4.ts"
-import { Timeout } from "timeout"
-import { Random } from "random";
+import { Timeout } from "timeout/mod.ts"
+import { Random } from "random/Random.js";
 
 import { Server } from "./server.ts";
 

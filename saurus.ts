@@ -1,4 +1,4 @@
-import { EventEmitter } from "mutevents"
+import { EventEmitter } from "mutevents/mod.ts"
 
 import { Console } from "./console.ts";
 import { Handler } from "./handler.ts";

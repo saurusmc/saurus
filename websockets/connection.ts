@@ -10,9 +10,9 @@ import {
   WebSocketEvent
 } from "std/ws/mod.ts";
 
-import { EventEmitter } from "mutevents";
-import { Timeout } from "timeout"
-import { Abort } from "abortable";
+import { EventEmitter } from "mutevents/mod.ts";
+import { Timeout } from "timeout/mod.ts"
+import { Abort } from "abortable/mod.ts";
 
 import { ChannelCloseError, WSChannel } from "./channel.ts";
 

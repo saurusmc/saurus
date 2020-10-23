@@ -1,4 +1,4 @@
-import { EventEmitter } from "mutevents"
+import { EventEmitter } from "mutevents/mod.ts"
 import {
   isMinecraftEvent,
   isPlayerEvent,

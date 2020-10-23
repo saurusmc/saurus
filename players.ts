@@ -1,4 +1,4 @@
-import { EventEmitter } from "mutevents"
+import { EventEmitter } from "mutevents/mod.ts"
 
 import type { Server } from "./server.ts"
 import { Player } from "./player.ts"

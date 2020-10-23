@@ -1,6 +1,6 @@
-import { EventEmitter } from "mutevents";
-import { Abort } from "abortable";
-import { Timeout } from "timeout";
+import { EventEmitter } from "mutevents/mod.ts";
+import { Abort } from "abortable/mod.ts";
+import { Timeout } from "timeout/mod.ts";
 
 
 import { CloseError, WSMessage } from "./message.ts";

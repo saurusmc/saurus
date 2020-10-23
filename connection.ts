@@ -1,4 +1,4 @@
-import { EventEmitter } from "mutevents"
+import { EventEmitter } from "mutevents/mod.ts"
 import * as UUID from "std/uuid/v4.ts"
 
 import type { ConnectionCloseError, WSConnection, } from "./websockets/connection.ts"
