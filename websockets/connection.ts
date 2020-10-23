@@ -1,3 +1,5 @@
+"use strict";
+
 import {
   WebSocket,
   isWebSocketPingEvent,
@@ -14,7 +16,7 @@ import { Abort } from "abortable";
 
 import { ChannelCloseError, WSChannel } from "./channel.ts";
 
-import { CloseError, WSMessage } from "./message.ts";
+import { CloseError, WSCloseMessage, WSMessage, WSOpenMessage } from "./message.ts";
 import { UUID } from "../types.ts";
 
 import * as UUIDs from "std/uuid/v4.ts"
@@ -46,7 +48,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     super();
 
     this.on(["message"],
-      this.onmessage.bind(this))
+      this.handlemessage.bind(this))
 
     this._listen()
       .catch(e => this.catch(e))
@@ -67,47 +69,51 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
 
   private async _listen() {
     for await (const e of this.socket)
-      this.handle(e)
+      this.handle(e).catch(e => this.catch(e))
 
     const error =
       new ConnectionCloseError()
-    this.emitSync("close", error)
+    await this.emit("close", error)
   }
 
-  private handle(e: WebSocketEvent) {
+  private async handle(e: WebSocketEvent) {
     if (isWebSocketPingEvent(e))
-      this.emitSync("ping", e)
+      await this.emit("ping", e)
 
     if (isWebSocketPongEvent(e))
-      this.emitSync("pong", e)
+      await this.emit("pong", e)
 
     if (isWebSocketCloseEvent(e)) {
       const error =
         new ConnectionCloseError(e.reason)
-      this.emitSync("close", error)
+      await this.emit("close", error)
     }
 
     if (typeof e === "string") {
       const msg =
         JSON.parse(e) as WSMessage
-      this.emitSync("message", msg)
+      await this.emit("message", msg)
     }
   }
 
-  private onmessage(msg: WSMessage) {
+  private handleopen(msg: WSOpenMessage) {
+    if (this.channels.has(msg.uuid))
+      throw new Error("UUID already exists")
+
+    const { uuid, path, data } = msg;
+    const channel = new WSChannel(this, uuid)
+    this.channels.set(uuid, channel)
+
+    channel.once(["close"], () =>
+      this.channels.delete(uuid))
+
+    this.paths.emit(path, { channel, data })
+      .catch(e => channel.catch(e))
+  }
+
+  private handlemessage(msg: WSMessage) {
     if (msg.type === "open") {
-      if (this.channels.has(msg.uuid))
-        throw new Error("UUID already exists")
-
-      const { uuid, path, data } = msg;
-      const channel = new WSChannel(this, uuid)
-      this.channels.set(uuid, channel)
-
-      channel.once(["close"], () =>
-        this.channels.delete(uuid))
-
-      this.paths.emitSync(path, { channel, data })
-
+      this.handleopen(msg)
       return
     }
 
@@ -115,20 +121,23 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     if (!channel) throw new Error("Invalid UUID")
 
     if (msg.type === undefined) {
-      channel.emitSync("message", msg.data)
+      channel.emit("message", msg.data)
+        .catch(e => channel.catch(e))
     }
 
     if (msg.type === "close") {
       const error =
         new ChannelCloseError("OK")
-      channel.emitSync("message", msg.data)
-      channel.emitSync("close", error)
+      channel.emit("message", msg.data)
+        .then(() => channel.emit("close", error))
+        .catch(e => channel.catch(e))
     }
 
     if (msg.type === "error") {
       const error =
         new ChannelCloseError(msg.reason)
-      channel.emitSync("close", error)
+      channel.emit("close", error)
+        .catch(e => channel.catch(e))
     }
   }
 
@@ -141,7 +150,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     await this.socket.close(1000, reason ?? "Unknown");
     const error =
       new ConnectionCloseError(reason)
-    this.emitSync("close", error)
+    await this.emit("close", error)
   }
 
   /**

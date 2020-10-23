@@ -59,7 +59,8 @@ export class WSServer extends EventEmitter<{
       })
 
       const conn = new WSConnection(socket)
-      this.emitSync("accept", conn)
+      this.emit("accept", conn)
+        .catch(e => conn.catch(e))
     } catch (e) {
       await req.respond({ status: 400 });
     }
