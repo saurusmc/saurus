@@ -48,7 +48,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     super();
 
     this.on(["message"],
-      this.handlemessage.bind(this))
+      this.onmessage.bind(this))
 
     this._listen()
       .catch(e => this.catch(e))
@@ -96,7 +96,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     }
   }
 
-  private handleopen(msg: WSOpenMessage) {
+  private async handleopen(msg: WSOpenMessage) {
     if (this.channels.has(msg.uuid))
       throw new Error("UUID already exists")
 
@@ -107,37 +107,41 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     channel.once(["close"], () =>
       this.channels.delete(uuid))
 
-    this.paths.emit(path, { channel, data })
-      .catch(e => channel.catch(e))
+    try {
+      await this.paths.emit(path, { channel, data })
+    } catch (e: unknown) {
+      channel.catch(e)
+    }
   }
 
-  private handlemessage(msg: WSMessage) {
+  private async onmessage(msg: WSMessage) {
     if (msg.type === "open") {
-      this.handleopen(msg)
+      await this.handleopen(msg)
       return
     }
 
     const channel = this.channels.get(msg.uuid)
     if (!channel) throw new Error("Invalid UUID")
 
-    if (msg.type === undefined) {
-      channel.emit("message", msg.data)
-        .catch(e => channel.catch(e))
-    }
+    try {
+      if (msg.type === undefined) {
+        await channel.emit("message", msg.data)
+      }
 
-    if (msg.type === "close") {
-      const error =
-        new ChannelCloseError("OK")
-      channel.emit("message", msg.data)
-        .then(() => channel.emit("close", error))
-        .catch(e => channel.catch(e))
-    }
+      if (msg.type === "close") {
+        const error =
+          new ChannelCloseError("OK")
+        await channel.emit("message", msg.data)
+        await channel.emit("close", error)
+      }
 
-    if (msg.type === "error") {
-      const error =
-        new ChannelCloseError(msg.reason)
-      channel.emit("close", error)
-        .catch(e => channel.catch(e))
+      if (msg.type === "error") {
+        const error =
+          new ChannelCloseError(msg.reason)
+        await channel.emit("close", error)
+      }
+    } catch (e: unknown) {
+      channel.catch(e)
     }
   }
 

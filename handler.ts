@@ -75,6 +75,8 @@ export class Handler extends EventEmitter<{
       await this.handleserver(channel, data)
     if (data.type === "app")
       await this.handleapp(channel, data)
+
+    throw new Cancelled("Handler")
   }
 
   private async handleserver(channel: WSChannel, hello: ServerHello) {
