@@ -9,14 +9,13 @@ import {
 import { acceptWebSocket } from "std/ws/mod.ts";
 
 import { EventEmitter } from "mutevents/mod.ts";
-import { ConnectionCloseError, WSConnection } from "./connection.ts";
-import { ChannelCloseError } from "./channel.ts";
+import { WSConnection } from "./connection.ts";
 
 export type { HTTPSOptions } from "std/http/server.ts"
 
 export interface ListenOptions {
-  hostname?: string
   port: number,
+  hostname?: string
   certFile?: string
   keyFile?: string
 }
@@ -25,9 +24,11 @@ function isHTTPS(options: ListenOptions): options is HTTPSOptions {
   return Boolean(options.certFile) && Boolean(options.keyFile)
 }
 
-export class WSServer extends EventEmitter<{
+export interface WSServerEvents {
   accept: WSConnection
-}> {
+}
+
+export class WSServer extends EventEmitter<WSServerEvents> {
   constructor(
     options: ListenOptions,
   ) {
@@ -59,9 +60,13 @@ export class WSServer extends EventEmitter<{
       })
 
       const conn = new WSConnection(socket)
-      this.emit("accept", conn)
-        .catch(e => conn.catch(e))
-    } catch (e) {
+
+      try {
+        await this.emit("accept", conn)
+      } catch (e: unknown) {
+        await conn.catch(e)
+      }
+    } catch (e: unknown) {
       await req.respond({ status: 400 });
     }
   }

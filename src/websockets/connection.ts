@@ -1,5 +1,3 @@
-"use strict";
-
 import {
   WebSocket,
   isWebSocketPingEvent,
@@ -16,7 +14,7 @@ import { Abort } from "abortable/mod.ts";
 
 import { ChannelCloseError, WSChannel } from "./channel.ts";
 
-import { CloseError, WSCloseMessage, WSMessage, WSOpenMessage } from "./message.ts";
+import { CloseError, WSMessage, WSOpenMessage } from "./types.ts";
 import { UUID } from "../types.ts";
 
 import * as UUIDs from "std/uuid/v4.ts"
@@ -42,6 +40,10 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     [path: string]: Message<unknown>
   }>()
 
+  /**
+   * Create a new connection from a socket
+   * @param socket Socket
+   */
   constructor(
     readonly socket: WebSocket
   ) {
@@ -54,9 +56,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
       .catch(e => this.catch(e))
   }
 
-  get closed() {
-    return this.socket.isClosed;
-  }
+  get closed() { return this.socket.isClosed }
 
   async catch(e: unknown) {
     if (e instanceof ConnectionCloseError)
@@ -65,11 +65,14 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
       await this.close(e.reason)
     else if (e instanceof Error)
       await this.close(e.message)
+    else throw e
   }
 
   private async _listen() {
-    for await (const e of this.socket)
-      this.handle(e).catch(e => this.catch(e))
+    for await (const e of this.socket) {
+      this.handle(e)
+        .catch(e => this.catch(e))
+    }
 
     const error =
       new ConnectionCloseError()
@@ -83,17 +86,13 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     if (isWebSocketPongEvent(e))
       await this.emit("pong", e)
 
-    if (isWebSocketCloseEvent(e)) {
-      const error =
-        new ConnectionCloseError(e.reason)
-      await this.emit("close", error)
-    }
+    if (isWebSocketCloseEvent(e))
+      await this.emit("close",
+        new ConnectionCloseError(e.reason))
 
-    if (typeof e === "string") {
-      const msg =
-        JSON.parse(e) as WSMessage
-      await this.emit("message", msg)
-    }
+    if (typeof e === "string")
+      await this.emit("message",
+        JSON.parse(e) as WSMessage)
   }
 
   private async handleopen(msg: WSOpenMessage) {
@@ -110,7 +109,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     try {
       await this.paths.emit(path, { channel, data })
     } catch (e: unknown) {
-      channel.catch(e)
+      await channel.catch(e)
     }
   }
 
@@ -124,24 +123,17 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
     if (!channel) throw new Error("Invalid UUID")
 
     try {
-      if (msg.type === undefined) {
+      if (msg.type === undefined)
         await channel.emit("message", msg.data)
-      }
 
-      if (msg.type === "close") {
-        const error =
-          new ChannelCloseError("OK")
-        await channel.emit("message", msg.data)
-        await channel.emit("close", error)
-      }
+      if (msg.type === "close")
+        await channel.emit("close", msg.data)
 
-      if (msg.type === "error") {
-        const error =
-          new ChannelCloseError(msg.reason)
-        await channel.emit("close", error)
-      }
+      if (msg.type === "error")
+        await channel.emit("close",
+          new ChannelCloseError(msg.reason))
     } catch (e: unknown) {
-      channel.catch(e)
+      await channel.catch(e)
     }
   }
 
@@ -151,7 +143,7 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
   }
 
   async close(reason?: string) {
-    await this.socket.close(1000, reason ?? "Unknown");
+    await this.socket.close(1000, reason ?? "");
     const error =
       new ConnectionCloseError(reason)
     await this.emit("close", error)
@@ -219,16 +211,14 @@ export class WSConnection extends EventEmitter<WSConnectionEvents> {
   }
 
   /**
-   * Open a channel; wait for a message; wait for close
+   * Open a channel and wait for a close message
    * @param path Path
-   * @param request Data to send
+   * @param data Data to send
    * @param delay Timeout delay
    * @returns Data received
    */
-  async request<T>(path: string, request?: unknown, delay = 1000) {
-    const channel = await this.open(path, request)
-    const result = await channel.read<T>(delay)
-    await channel.waitclose;
-    return result;
+  async request<T>(path: string, data?: unknown, delay = 1000) {
+    const channel = await this.open(path, data)
+    return await channel.final<T>(delay)
   }
 }

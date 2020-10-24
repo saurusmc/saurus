@@ -1,8 +1,12 @@
-export type WSMessage = WSOpenMessage | WSOtherMessage | WSCloseMessage | WSErrorMessage
-
 export class CloseError extends Error {
   constructor(readonly reason?: string) { super(`Closed`) }
 }
+
+export type WSMessage =
+  | WSOpenMessage
+  | WSOtherMessage
+  | WSCloseMessage
+  | WSErrorMessage
 
 export interface WSOpenMessage {
   uuid: string

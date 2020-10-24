@@ -12,7 +12,6 @@ export interface ServerEvents extends ConnectionEvents {
 }
 
 export class Server extends Connection<ServerEvents> {
-
   players = new Players(this)
 
   constructor(
