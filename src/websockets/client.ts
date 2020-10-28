@@ -4,9 +4,11 @@ import { ConnectionCloseError } from "./errors.ts";
 import { WSMessage } from "./types.ts";
 
 export class WSClientConn extends WSConn {
+  readonly waitready = this._waitready().catch()
+  readonly socket = new WebSocket(this.uri)
 
   constructor(
-    readonly socket: WebSocket
+    readonly uri: string
   ) {
     super()
 

@@ -119,25 +119,11 @@ export abstract class WSConn extends EventEmitter<WSConnectionEvents> {
     const message = this.paths.wait([path])
     const close = this.error(["close"])
 
-    if (delay > 0) {
-      const msg =
-        await Timeout.race([message, close], 1000)
-      return msg as Message<T>
-    } else {
-      const msg =
-        await Abort.race([message, close])
-      return msg as Message<T>
-    }
-  }
+    const msg = delay > 0
+      ? await Timeout.race([message, close], 1000)
+      : await Abort.race([message, close])
 
-  /**
-   * Listen on a path
-   * @param path Path to listen on
-   * @yields Message
-   * @throws CloseError
-   */
-  async* listen(path: string) {
-    while (true) yield this.waitopen(path)
+    return msg as Message<T>
   }
 
   private genUUID() {

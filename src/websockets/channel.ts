@@ -94,20 +94,6 @@ export class WSChannel extends EventEmitter<WSChannelEvents> {
     await conn.send({ uuid, data })
   }
 
-  async *listen<T = unknown>() {
-    const buffer = new Array<unknown>()
-
-    const off = this.on(["message"], buffer.push)
-    this.once(["close"], off, buffer.push)
-
-    while (!this.closed) {
-      if (!buffer.length) continue
-      const x = buffer.shift()
-      if (x instanceof Error) break;
-      yield x as T
-    }
-  }
-
   /**
    * Wait for any message.
    * Throws if it's closed with an error or timed out
