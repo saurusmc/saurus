@@ -9,8 +9,8 @@ import { Server } from "./server.ts";
 import type { Player } from "./player.ts";
 import { App } from "./app.ts";
 
-import { ListenOptions, WSServer } from "./websockets/server.ts";
-import { WSConnection } from "./websockets/connection.ts";
+import { ListenOptions, WSServer, WSServerConn } from "./websockets/server.ts";
+import { WSConn } from "./websockets/conn.ts";
 import { WSChannel } from "./websockets/channel.ts";
 import type { PlayerInfo } from "./types.ts";
 import { isMinecraftEvent } from "./events.ts";
@@ -44,7 +44,7 @@ export class Handler extends EventEmitter<{
   code: CodeRequest
   server: Server
 }> {
-  readonly wsserver = new WSServer(this.options)
+  readonly ws = new WSServer(this.options)
   readonly codes = new Map<string, App>()
   readonly tokens = new Map<string, Player>()
 
@@ -53,7 +53,7 @@ export class Handler extends EventEmitter<{
   ) {
     super()
 
-    this.wsserver.on(["accept"],
+    this.ws.on(["accept"],
       this.onaccept.bind(this))
 
     this.on(["server"],
@@ -67,9 +67,9 @@ export class Handler extends EventEmitter<{
     }
   }
 
-  private async onaccept(conn: WSConnection) {
+  private async onaccept(conn: WSConn) {
     const { channel, data } = await
-      conn.waitopen<Hello>("/hello", 1000)
+      conn.waitopen<Hello>("/hello")
 
     if (data.type === "server")
       await this.handleserver(channel, data)
@@ -81,13 +81,15 @@ export class Handler extends EventEmitter<{
 
   private async handleserver(channel: WSChannel, hello: ServerHello) {
     const { name, password, platform } = hello
-    const server = new Server(channel.conn, name, platform, password)
+    const conn = channel.conn as WSServerConn
+    const server = new Server(conn, name, platform, password)
     await channel.close({ uuid: server.uuid })
     await this.emit("server", server)
   }
 
   private async handleapp(channel: WSChannel, hello: AppHello) {
-    const app = new App(channel.conn)
+    const conn = channel.conn as WSServerConn
+    const app = new App(conn)
 
     if (!hello.token) {
       const code = this.genCode()

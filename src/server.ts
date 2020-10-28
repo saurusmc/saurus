@@ -4,8 +4,9 @@ import { Abort } from "abortable/mod.ts"
 import { Players } from "./players.ts";
 import { Connection, ConnectionEvents } from "./connection.ts";
 
-import type { WSConnection } from "./websockets/connection.ts";
+import type { WSConn } from "./websockets/conn.ts";
 import { Event } from "./events.ts";
+import { WSServerConn } from "./websockets/server.ts";
 
 export interface ServerEvents extends ConnectionEvents {
   event: Event
@@ -15,12 +16,12 @@ export class Server extends Connection<ServerEvents> {
   players = new Players(this)
 
   constructor(
-    readonly conn: WSConnection,
+    readonly ws: WSServerConn,
     readonly name: string,
     readonly platform: string,
     readonly password: string,
   ) {
-    super(conn)
+    super(ws)
 
     this.heartbeat()
     this.listenevents()
@@ -30,11 +31,10 @@ export class Server extends Connection<ServerEvents> {
     try {
       while (true) {
         await Timeout.wait(1000)
-        await this.conn.socket.ping()
-        const pong = this.conn.wait(["pong"])
-        const close = this.conn.error(["close"])
-        const timeout = Timeout.error(5000)
-        await Abort.race([pong, close, timeout])
+        await this.ws.ping()
+        const pong = this.ws.wait(["pong"])
+        const close = this.ws.error(["close"])
+        await Timeout.race([pong, close], 5000)
       }
     } catch (e: unknown) {
       if (e instanceof TimeoutError)

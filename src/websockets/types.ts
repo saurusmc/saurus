@@ -1,7 +1,3 @@
-export class CloseError extends Error {
-  constructor(readonly reason?: string) { super(`Closed`) }
-}
-
 export type WSMessage =
   | WSOpenMessage
   | WSOtherMessage

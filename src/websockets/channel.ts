@@ -2,11 +2,10 @@ import { EventEmitter } from "mutevents/mod.ts";
 import { Abort } from "abortable/mod.ts";
 import { Timeout } from "timeout/mod.ts";
 
-import { CloseError, WSMessage } from "./types.ts";
+import { WSMessage } from "./types.ts";
 
-import { WSConnection } from "./connection.ts";
-
-export class ChannelCloseError extends CloseError { }
+import { WSConn } from "./conn.ts";
+import { ChannelCloseError, CloseError } from "./errors.ts";
 
 export interface WSChannelEvents {
   close: unknown
@@ -22,7 +21,7 @@ export class WSChannel extends EventEmitter<WSChannelEvents> {
    * @param uuid Channel UUID
    */
   constructor(
-    readonly conn: WSConnection,
+    readonly conn: WSConn,
     readonly uuid: string
   ) {
     super()
@@ -96,7 +95,17 @@ export class WSChannel extends EventEmitter<WSChannelEvents> {
   }
 
   async *listen<T = unknown>() {
-    while (!this.closed) yield this.read<T>()
+    const buffer = new Array<unknown>()
+
+    const off = this.on(["message"], buffer.push)
+    this.once(["close"], off, buffer.push)
+
+    while (!this.closed) {
+      if (!buffer.length) continue
+      const x = buffer.shift()
+      if (x instanceof Error) break;
+      yield x as T
+    }
   }
 
   /**

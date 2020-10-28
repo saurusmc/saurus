@@ -1,11 +1,12 @@
-import type { WSConnection } from "./websockets/connection.ts";
+import type { WSConn } from "./websockets/conn.ts";
 
 import { Connection } from "./connection.ts";
+import { WSServerConn } from "./websockets/server.ts";
 
 export class App extends Connection {
   constructor(
-    readonly conn: WSConnection,
+    readonly ws: WSServerConn,
   ) {
-    super(conn)
+    super(ws)
   }
 }

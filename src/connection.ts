@@ -1,36 +1,39 @@
 import { EventEmitter } from "mutevents/mod.ts"
 import * as UUID from "std/uuid/v4.ts"
 
-import type { ConnectionCloseError, WSConnection, } from "./websockets/connection.ts"
+import type { WSConn, } from "./websockets/conn.ts"
+import { CloseError } from "./websockets/errors.ts"
+import { WSServerConn } from "./websockets/server.ts"
 
 export interface ConnectionEvents {
-  close: ConnectionCloseError
+  close: CloseError
 }
 
 export class Connection<T extends ConnectionEvents = ConnectionEvents> extends EventEmitter<T> {
   readonly uuid = UUID.generate()
 
   constructor(
-    readonly conn: WSConnection
+    readonly ws: WSServerConn
   ) {
     super()
 
-    conn.once(["close"], this.reemit("close"))
+    ws.once(["close"],
+      this.reemit("close"))
   }
 
   get paths() {
-    return this.conn.paths
+    return this.ws.paths
   }
 
   async close(reason?: string) {
-    await this.conn.close(reason);
+    await this.ws.close(reason);
   }
 
   async open(path: string, data?: unknown) {
-    return await this.conn.open(path, data)
+    return await this.ws.open(path, data)
   }
 
   async request<T>(path: string, data?: unknown) {
-    return await this.conn.request<T>(path, data)
+    return await this.ws.request<T>(path, data)
   }
 }
