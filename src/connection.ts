@@ -1,9 +1,7 @@
-import { EventEmitter } from "mutevents/mod.ts"
-import * as UUID from "std/uuid/v4.ts"
+import { EventEmitter } from "../deps/mutevents.ts"
+import * as UUID from "../deps/uuid.ts"
 
-import type { WSConn, } from "./websockets/conn.ts"
-import { CloseError } from "./websockets/errors.ts"
-import { WSServerConn } from "./websockets/server.ts"
+import { CloseError, WSServerConn } from "../deps/multisocket.ts"
 
 export interface ConnectionEvents {
   close: CloseError

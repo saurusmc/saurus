@@ -1,12 +1,11 @@
-import { Timeout, TimeoutError } from "timeout/mod.ts"
-import { Abort } from "abortable/mod.ts"
+import { Timeout, TimeoutError } from "../deps/timeout.ts"
 
 import { Players } from "./players.ts";
 import { Connection, ConnectionEvents } from "./connection.ts";
 
-import type { WSConn } from "./websockets/conn.ts";
 import { Event } from "./events.ts";
-import { WSServerConn } from "./websockets/server.ts";
+
+import { WSServerConn } from "../deps/multisocket.ts"
 
 export interface ServerEvents extends ConnectionEvents {
   event: Event

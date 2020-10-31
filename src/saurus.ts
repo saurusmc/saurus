@@ -1,10 +1,10 @@
-import { EventEmitter } from "mutevents/mod.ts"
+import { EventEmitter } from "../deps/mutevents.ts"
+import { ListenOptions } from "../deps/multisocket.ts";
 
 import { Console } from "./console.ts";
 import { Handler } from "./handler.ts";
 
 import type { Server } from "./server.ts";
-import type { ListenOptions } from "./websockets/server.ts";
 
 export class Saurus extends EventEmitter<{
   server: Server

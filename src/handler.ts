@@ -1,19 +1,24 @@
 
-import { Cancelled, EventEmitter } from "mutevents/mod.ts"
-import * as UUID from "std/uuid/v4.ts"
-import { Timeout } from "timeout/mod.ts"
-import { Random } from "random/Random.js";
+import { Cancelled, EventEmitter } from "../deps/mutevents.ts"
+import * as UUID from "../deps/uuid.ts"
+import { Timeout } from "../deps/timeout.ts"
 
 import { Server } from "./server.ts";
 
 import type { Player } from "./player.ts";
 import { App } from "./app.ts";
 
-import { ListenOptions, WSServer, WSServerConn } from "./websockets/server.ts";
-import { WSConn } from "./websockets/conn.ts";
-import { WSChannel } from "./websockets/channel.ts";
+import {
+  ListenOptions,
+  Message,
+  WSChannel,
+  WSConn,
+  WSServer,
+  WSServerConn
+} from "../deps/multisocket.ts"
+
 import type { PlayerInfo } from "./types.ts";
-import { isMinecraftEvent } from "./events.ts";
+import { isMinecraftEvent, PlayerCodeEvent } from "./events.ts";
 
 export type Hello = ServerHello | AppHello
 
@@ -62,14 +67,14 @@ export class Handler extends EventEmitter<{
 
   private genCode() {
     while (true) {
-      const code = new Random().string(6)
+      const code = UUID.generate().slice(0, 6)
       if (!this.codes.has(code)) return code
     }
   }
 
   private async onaccept(conn: WSConn) {
     const { channel, data } = await
-      conn.waitopen<Hello>("/hello")
+      conn.waitpath("/hello") as Message<Hello>
 
     if (data.type === "server")
       await this.handleserver(channel, data)
@@ -96,9 +101,19 @@ export class Handler extends EventEmitter<{
       this.codes.set(code, app)
       await channel.send(code)
 
+      const emitter = new EventEmitter<{
+        code: Player
+      }>()
+
+      const off = this.on(["code"], async (e) => {
+        if (e.code !== code) return
+        await emitter.emit("code", e.player)
+        off()
+      })
+
+      const promise = emitter.wait(["code"])
       const close = channel.error(["close"])
-      const promise = this.wait(["code"], e => e.code === code)
-      const { player } = await Timeout.race([promise, close], 60000)
+      const player = await Timeout.race([promise, close], 60000)
 
       const token = UUID.generate()
       this.tokens.set(token, player)

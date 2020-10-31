@@ -1,5 +1,5 @@
-import { readLines } from "std/io/bufio.ts";
-import { Cancelled, EventEmitter } from "mutevents/mod.ts"
+import { readLines } from "../deps/io.ts";
+import { Cancelled, EventEmitter } from "../deps/mutevents.ts"
 
 export class Help {
   readonly map = new Map<string, string>()

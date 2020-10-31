@@ -1,7 +1,6 @@
-import type { WSConn } from "./websockets/conn.ts";
-
 import { Connection } from "./connection.ts";
-import { WSServerConn } from "./websockets/server.ts";
+
+import { WSServerConn } from "../deps/multisocket.ts"
 
 export class App extends Connection {
   constructor(
