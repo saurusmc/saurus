@@ -18,7 +18,7 @@ import {
 } from "../deps/multisocket.ts"
 
 import type { PlayerInfo } from "./types.ts";
-import { isMinecraftEvent, PlayerCodeEvent } from "./events.ts";
+import { isMinecraftEvent, isPlayerEvent } from "./events.ts";
 
 export type Hello = ServerHello | AppHello
 
@@ -76,10 +76,14 @@ export class Handler extends EventEmitter<{
     const { channel, data } = await
       conn.waitpath("/hello") as Message<Hello>
 
-    if (data.type === "server")
-      await this.handleserver(channel, data)
-    if (data.type === "app")
-      await this.handleapp(channel, data)
+    try {
+      if (data.type === "server")
+        await this.handleserver(channel, data)
+      if (data.type === "app")
+        await this.handleapp(channel, data)
+    } catch (e: unknown) {
+      await channel.catch(e)
+    }
 
     throw new Cancelled("Handler")
   }
@@ -147,11 +151,25 @@ export class Handler extends EventEmitter<{
   private async onserver(server: Server) {
     const off = server.on(["event"], async (e) => {
       if (!isMinecraftEvent(e)) return
-      if (e.event !== "player.code") return
-      const { player: { uuid }, code } = e
-      const player = server.players.uuids.get(uuid)
-      if (!player) throw new Cancelled("Invalid player")
-      await this.emit("code", { player, code })
+      if (!isPlayerEvent(e)) return
+
+      if (e.event !== "player.command") return
+
+      const [label, ...args] = e.command.split(" ")
+      if (label !== "authorize") return
+
+      const player = server.players.get(e.player)
+      if (!player) throw new Error("Invalid player")
+
+      try {
+        const [code] = args
+        if (!code) throw new Error("autorize <code>")
+        await this.emit("code", { player, code })
+      } catch (e: unknown) {
+        await player.catch(e)
+      }
+
+      throw new Cancelled("Handler")
     })
 
     server.once(["close"], off)

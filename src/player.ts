@@ -1,6 +1,5 @@
-import { EventEmitter } from "../deps/mutevents.ts"
+import { Cancelled, EventEmitter } from "../deps/mutevents.ts"
 import {
-  isMinecraftEvent,
   isPlayerEvent,
   MinecraftEvent,
   Event,
@@ -10,7 +9,8 @@ import {
   PlayerQuitEvent,
   PlayerRespawnEvent,
   PlayerSneakEvent,
-  PlayerTeleportEvent
+  PlayerTeleportEvent,
+  PlayerCommandEvent
 } from "./events.ts"
 
 import type { App } from "./app.ts"
@@ -31,6 +31,7 @@ export interface PlayerEvents {
   fly: PlayerFlyEvent
   respawn: PlayerRespawnEvent
   teleport: PlayerTeleportEvent
+  command: PlayerCommandEvent
 }
 
 export class Player extends EventEmitter<PlayerEvents>  {
@@ -56,9 +57,16 @@ export class Player extends EventEmitter<PlayerEvents>  {
     const offauthorize = this.on(["authorize"],
       this.onautorize.bind(this))
 
+    this.on(["command", "after"], () =>
+      this.msg("Unknown command."))
+
     this.once(["quit"],
-      offclose, offevent, offauthorize
-    )
+      offclose, offevent, offauthorize)
+  }
+
+  async catch(e: unknown) {
+    if (e instanceof Error)
+      await this.msg(e.message)
   }
 
   get json() {
@@ -78,7 +86,6 @@ export class Player extends EventEmitter<PlayerEvents>  {
   }
 
   private async onevent(e: MinecraftEvent | Event) {
-    if (!isMinecraftEvent(e)) return;
     if (!isPlayerEvent(e)) return
     if (e.player.uuid !== this.uuid) return
 
@@ -99,6 +106,9 @@ export class Player extends EventEmitter<PlayerEvents>  {
 
     if (e.event === "player.teleport")
       await this.emit("teleport", e)
+
+    if (e.event === "player.command")
+      await this.emit("command", e)
   }
 
   private async onautorize(app: App) {

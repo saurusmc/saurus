@@ -9,12 +9,12 @@ export const minecraftEvents = [
   "player.respawn",
   // "player.move",
   "player.chat",
-  "player.code",
   "player.sneak",
   "player.fly",
   "player.sprint",
   "player.teleport",
-  "weather.change"
+  "player.command",
+  "weather.change",
 ]
 
 export type MinecraftEvent =
@@ -24,11 +24,11 @@ export type MinecraftEvent =
   | PlayerRespawnEvent
   // | PlayerMoveEvent
   | PlayerChatEvent
-  | PlayerCodeEvent
   | PlayerSneakEvent
   | PlayerFlyEvent
   | PlayerSprintEvent
   | PlayerTeleportEvent
+  | PlayerCommandEvent
   | WeatherChangeEvent
 
 export function isMinecraftEvent(e: Event): e is MinecraftEvent {
@@ -82,11 +82,6 @@ export interface PlayerChatEvent extends PlayerEvent {
   message: string
 }
 
-export interface PlayerCodeEvent extends PlayerEvent {
-  event: "player.code"
-  code: string
-}
-
 export interface PlayerSneakEvent extends PlayerEvent {
   event: "player.sneak"
   sneaking: boolean
@@ -107,6 +102,11 @@ export interface PlayerTeleportEvent extends PlayerEvent {
   cause: TeleportCause
   from: Location
   to?: Location
+}
+
+export interface PlayerCommandEvent extends PlayerEvent {
+  event: "player.command"
+  command: string
 }
 
 export interface WeatherChangeEvent {
