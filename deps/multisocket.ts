@@ -1,1 +1,1 @@
-export * from "https://raw.githubusercontent.com/hazae41/multisocket/6c74d7f81041deccaa5119ae222363f3dd5205bc/mod.ts"
+export * from "https://deno.land/x/multisocket@1.0/mod.ts"

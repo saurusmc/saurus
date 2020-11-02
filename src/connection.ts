@@ -31,7 +31,7 @@ export class Connection<T extends ConnectionEvents = ConnectionEvents> extends E
     return await this.ws.open(path, data)
   }
 
-  async request<T>(path: string, data?: unknown) {
-    return await this.ws.request<T>(path, data)
+  async request(path: string, data?: unknown) {
+    return await this.ws.request(path, data)
   }
 }

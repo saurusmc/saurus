@@ -126,7 +126,7 @@ export class Player extends EventEmitter<PlayerEvents>  {
 
   private async request<T = unknown>(path: string, data = {}) {
     const request = { player: this.json, ...data }
-    return await this.server.request<T>(path, request)
+    return await this.server.request(path, request) as T
   }
 
   async kick(reason?: string) {
@@ -171,8 +171,8 @@ export class Player extends EventEmitter<PlayerEvents>  {
   }
 
   async teleportEntity(entity: UUID, cause?: TeleportCause) {
-    await this
-      .request("/player/teleport", { entity, cause })
+    await this.request("/player/teleport",
+      { entity, cause })
   }
 
   async teleportPlayer(player: PlayerInfo, cause?: TeleportCause) {

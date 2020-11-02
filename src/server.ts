@@ -53,6 +53,6 @@ export class Server extends Connection<ServerEvents> {
   }
 
   async execute(command: string) {
-    return await this.request<boolean>("/execute", command)
+    return await this.request("/execute", command) as boolean
   }
 }
