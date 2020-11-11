@@ -19,25 +19,19 @@ import {
 
 import type { PlayerInfo } from "./types.ts";
 import { isMinecraftEvent, isPlayerEvent } from "./events.ts";
+import { Abortable } from "https://deno.land/x/abortable@1.4/mod.ts";
 
 export type Hello = ServerHello | AppHello
 
+export interface AppHello {
+  type: "app"
+}
+
 export interface ServerHello {
-  type: "server" | "proxy",
+  type: "server",
   name: string,
   platform: string,
   password: string,
-}
-
-export interface AppHello {
-  type: "app",
-  token?: string
-}
-
-export interface AppWelcome {
-  uuid: string,
-  player: PlayerInfo,
-  token: string
 }
 
 export interface CodeRequest {
@@ -80,7 +74,7 @@ export class Handler extends EventEmitter<{
       if (data.type === "server")
         await this.handleserver(channel, data)
       if (data.type === "app")
-        await this.handleapp(channel, data)
+        await this.handleapp(channel)
     } catch (e: unknown) {
       await channel.catch(e)
     }
@@ -96,28 +90,30 @@ export class Handler extends EventEmitter<{
     await this.emit("server", server)
   }
 
-  private async handleapp(channel: WSChannel, hello: AppHello) {
-    const conn = channel.conn as WSServerConn
-    const app = new App(conn)
+  private async handleapp(channel: WSChannel) {
+    const app = new App(channel.conn as WSServerConn)
 
-    if (!hello.token) {
-      const code = this.genCode()
-      this.codes.set(code, app)
-      await channel.send(code)
+    const code = this.genCode()
+    this.codes.set(code, app)
 
-      const emitter = new EventEmitter<{
-        code: Player
-      }>()
+    app.once(["close"], () =>
+      this.codes.delete(code))
 
-      const off = this.on(["code"], async (e) => {
-        if (e.code !== code) return
-        await emitter.emit("code", e.player)
-        off()
-      })
+    const offtoken = app.ws.paths.on(["/connect"], async (msg) => {
+      const { channel, data } = msg
+      const token = data as string
 
-      const promise = emitter.wait(["code"])
-      const close = channel.error(["close"])
-      const player = await Timeout.race([promise, close], 60000)
+      const player = this.tokens.get(token)
+      if (!player) throw new Error("Invalid token")
+
+      await channel.close(player.json)
+      await player.emit("authorize", app)
+      await app.emit("authorize", player)
+    })
+
+    const offcode = this.on(["code"], async (e) => {
+      if (e.code !== code) return
+      const player = e.player
 
       const token = UUID.generate()
       this.tokens.set(token, player)
@@ -125,27 +121,21 @@ export class Handler extends EventEmitter<{
       player.once(["quit"],
         () => this.tokens.delete(token))
 
-      const welcome: AppWelcome = {
-        uuid: app.uuid,
-        player: player.json,
-        token
-      }
-
-      await channel.close(welcome)
+      await channel.close(player.json)
       await player.emit("authorize", app)
-    } else {
-      const player = this.tokens.get(hello.token)
-      if (!player) throw new Error("Invalid token")
+      await app.emit("authorize", player)
+    })
 
-      const welcome: AppWelcome = {
-        uuid: app.uuid,
-        player: player.json,
-        token: hello.token
-      }
+    app.once(["close"], offcode, offtoken)
 
-      await channel.close(welcome)
-      await player.emit("authorize", app)
-    }
+    const authorized = app.wait(["authorize"])
+    const closed = app.error(["close"])
+
+    await channel.send(code)
+
+    await Timeout.race([authorized, closed], 60000)
+
+    console.log("App connected!")
   }
 
   private async onserver(server: Server) {
