@@ -10,7 +10,7 @@ export type QuitEvent = PlayerQuitEvent & { player: Player }
 
 export interface PlayersEvents {
   join: JoinEvent
-  quit?: QuitEvent
+  quit: QuitEvent
 }
 
 export class Players extends EventEmitter<PlayersEvents> {
