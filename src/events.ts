@@ -1,4 +1,4 @@
-import { Location, PlayerInfo, TeleportCause } from "./types.ts";
+import { Location, PlayerInfo, TeleportCause, WorldInfo } from "./types.ts";
 
 export interface Event { event: string }
 
@@ -111,5 +111,6 @@ export interface PlayerCommandEvent extends PlayerEvent {
 
 export interface WeatherChangeEvent {
   event: "weather.change"
+  world: WorldInfo
   raining: boolean
 }
