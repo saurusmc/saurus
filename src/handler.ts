@@ -19,7 +19,7 @@ import {
 
 import type { PlayerInfo } from "./types.ts";
 import { isMinecraftEvent, isPlayerEvent } from "./events.ts";
-import { Abortable } from "https://deno.land/x/abortable@1.4/mod.ts";
+import { Abortable } from "../deps/abortable.ts";
 
 export type Hello = ServerHello | AppHello
 

@@ -1,1 +1,1 @@
-export * from "https://deno.land/x/mutevents@5.3.1/mod.ts"
+export * from "https://deno.land/x/mutevents@5.3.2/mod.ts"
